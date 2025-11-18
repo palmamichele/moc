@@ -4,9 +4,11 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import time
 
+
+
+
+
 #deterministic functions 
-
-
 class E2LSH:
     def __init__(self,dim, w=4.0, k=20, P=2**32-5, tableSize=100000):
         self.dim = dim
@@ -49,7 +51,7 @@ class E2LSH:
 
 
 class EuclideanLSH:
-    def __init__(self, dim, w=4.0, k=20, L=20):
+    def __init__(self, dim, w=4.0, k=20, L=20, a=None, b=None):
         """
         LSH for Euclidean space.
         dim: dimension of input vectors
@@ -62,8 +64,13 @@ class EuclideanLSH:
         self.k = k
         self.L = L
         
-        self.a = [np.random.randn(k, dim) for _ in range(L)]
-        self.b = [np.random.uniform(0, w, size=k) for _ in range(L)]
+        self.a=a
+        if a==None:
+            self.a = [np.random.randn(k, dim) for _ in range(L)]
+        
+        self.b=b
+        if b==None:
+            self.b = [np.random.uniform(0, w, size=k) for _ in range(L)]
         self.tables = [defaultdict(list) for _ in range(L)]
 
     def _hash(self, x, i):
@@ -108,6 +115,18 @@ class EuclideanLSH:
     
 
 
+def eemoc(B,z):
+    #efficient exact moc
+    #we need to do line search in B up to bin z
+    mx = 0
+    searchSet = [i  for i in  B.keys() if i<= z]
+    for i in searchSet:
+        
+        mx = max(mx, B[i])
+    return mx
+
+    
+
 def moc(X,Y, dx, dy, t):
     #assuming X, Y are metric spaces (discrete sets), 
     #where Y[i] corresponds to function evaluated at X[i].
@@ -132,13 +151,16 @@ def euclidean(x,y):
 
 
 np.random.seed(0)
-dim = [100,1000, 1000**2] 
-num_points = [100,1000,10000]
+dim = [3600, 10000, 512**2] 
+num_points = [10000,100000]
 dx=euclidean
 dy=euclidean
 max_dist = 300
 L=100
 K =10
+h=1
+
+
 
 
 def f1(x):
@@ -155,27 +177,44 @@ def f3(x):
 
 functions=[f1, f2, f3]
 
+b = [np.random.uniform(0, max_dist, size=K) for _ in range(L)]
 for d in dim:
+    a=[np.random.randn(K, d) for _ in range(L)]
     for n in num_points:
-
         x = [np.random.rand(d)*np.random.randint(-max_dist/2,max_dist/2) for _ in range(n)]
+        
+
         f=[[],[],[]]
         f[0] = [f1(x1) for x1 in x]
         f[1]=[f2(x1) for x1 in x]
         f[2]=[f3(x1) for x1 in x]
 
-
+        B=[[],[],[]]
 
         for experiment in range(1):
-            t= np.arange(0, max_dist+1, 1)
+            t= np.arange(0, max_dist+1, h)
             fmocs=[[],[],[]]
             annfmocs=[[],[],[]]
             aannfmocs=[[],[],[]]
             timesteps = []
             timesteps.append(time.time())
 
+            for idxf in range(3):
+                for i in range(len(x)):
+                    for j in range(len(x)):
+                        sij=dx(x[i],x[j])
+                        dij=dy(f[idxf][i],f[idxf][j])
+                        binindex = int(np.floor(sij/h))
+                        if binindex >= len(B[idxf]):
+                            B[idxf].extend([0.0] * (binindex + 1 - len(B[idxf])))
+                        B[idxf][binindex]=max(B[idxf][binindex], dij)
+
+            Bprefix= [np.maximum.accumulate(B[0]), np.maximum.accumulate(B[1]), np.maximum.accumulate(B[2]) ]
+            exactCost=time.time()
+            timesteps.append(exactCost)
+
             for delta in t:
-                lsh = EuclideanLSH(dim=d, w=delta, k=K,L=L)
+                lsh = EuclideanLSH(dim=d, w=delta, k=K,L=L, a=a, b=b)
                 
                 for i, vec in enumerate(x):
                     lsh.insert(vec,i)
@@ -186,9 +225,9 @@ for d in dim:
                     annfmocs[j].append(annmoc(pairs,f[j],euclidean))
                     timesteps.append(time.time())
                     print(f"LSH rNN time for delta {delta}: {timesteps[-1] - timesteps[-2]} seconds")
-                    fmocs[j].append(moc(x,f[j],euclidean,euclidean,delta))
+                    fmocs[j].append(Bprefix[j][int(np.floor(delta/h))])
                     timesteps.append(time.time())
-                    print(f"Exact rNN time for delta {delta}: {timesteps[-1] - timesteps[-2]} seconds")
+                    print(f"Exact rNN time for delta {delta}: {timesteps[-1] - timesteps[-2]+ (exactCost)/len(t)} seconds")
 
                 alsh = E2LSH(dim=d, w=delta, k=K, tableSize=n)
                 for i,vec in enumerate(x):
