@@ -1,0 +1,9 @@
+.venv
+venv/
+.venv/
+.vscode/
+main.dSYM/
+include/
+
+*.so
+*.o
