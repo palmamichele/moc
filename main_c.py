@@ -179,6 +179,9 @@ h=1
 num_functions = 3
 
 
+os.environ['OMP_NUM_THREADS'] = '14'   # pick desired number
+
+
 lib = ctypes.CDLL("./libbprefix.so")
 lib.compute_bprefix_c.argtypes = [
     POINTER(c_double),  # x_data
@@ -193,6 +196,9 @@ lib.compute_bprefix_c.argtypes = [
 lib.compute_bprefix_c.restype = POINTER(c_float)
 lib.free_buffer.argtypes = [POINTER(c_float)]
 lib.free_buffer.restype = None
+
+
+lib.omp_debug_print()
 
 def f1(x):
     return np.dot(2*np.ones_like(x), x)
