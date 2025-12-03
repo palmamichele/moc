@@ -1,13 +1,12 @@
-// bprefix_lib_openmp.cpp
-#include <iostream>
-#include <vector>
-#include <functional>
+//   g++ -O3 -std=c++17 -fopenmp -I /path/to/eigen bprefix_lib.cpp -o libbprefix.so
+
 #include <cmath>
-#include <algorithm>
-#include <stdexcept>
+#include <vector>
 #include <cstdlib>
-#include <cstddef>
 #include <cstring>
+#include <stdexcept>
+#include <algorithm>
+#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -16,116 +15,184 @@ inline int omp_get_max_threads(){ return 1; }
 inline int omp_get_thread_num(){ return 0; }
 #endif
 
+
 extern "C" {
 typedef double c_double;
 typedef float  c_float;
 typedef std::size_t c_size;
 }
 
-using Point    = std::vector<double>;
-using Dataset  = std::vector<Point>;
-using FDataset = std::vector<Dataset>;
+// Eigen
+#include <Eigen/Core>
+#include <Eigen/Dense>
 
-float euclideanDistance(const Point& a, const Point& b) {
-    if (a.size() != b.size()) throw std::invalid_argument("Dimension mismatch");
-    double sum = 0.0;
-    for (size_t i = 0; i < a.size(); ++i) {
-        double d = a[i] - b[i];
-        sum += d * d;
+
+using Scalar = double;
+using Index  = Eigen::Index;
+using Size   = std::size_t;
+using MatrixR = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using VectorR = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
+
+// block shall fit comfortably in L2 cache
+static const Size DEFAULT_BLOCK = 128;
+
+
+
+
+static inline float euclideanDistance_vec(const double* a, const double* b, Size dim) {
+    double s = 0.0;
+    for (Size k = 0; k < dim; ++k) {
+        double d = a[k] - b[k];
+        s += d * d;
     }
-    return static_cast<float>(std::sqrt(sum));
+    return static_cast<float>(std::sqrt(s));
 }
 
-// Helper that computes max bin index (one pass)
-static int compute_max_binindex(const Dataset& x, double h) {
-    const size_t n = x.size();
-    long maxBin = 0;
+static std::vector<float> computeBprefix_eigen(const c_double* x_data,
+                                               Size n,
+                                               Size dx_dim,
+                                               const c_double* f_data,
+                                               Size f_dim,
+                                               Size idxf_unused, 
+                                               double h,
+                                               Size block = DEFAULT_BLOCK)
+{
+    if (!x_data || !f_data) throw std::invalid_argument("null data pointer");
+    if (n == 0) return {};
+    if (dx_dim == 0 || f_dim == 0) throw std::invalid_argument("invalid dimension");
+    if (h <= 0.0) throw std::invalid_argument("h must be > 0");
+
+    // Map raw C arrays (row-major: n rows, dx_dim columns)
+    Eigen::Map<const MatrixR> X(x_data, static_cast<Index>(n), static_cast<Index>(dx_dim));
+    Eigen::Map<const MatrixR> F(f_data, static_cast<Index>(n), static_cast<Index>(f_dim));
+
+    // Precompute squared norms for each row 
+    VectorR Xnorm2(n), Fnorm2(n);
+    #pragma omp parallel for schedule(static)
+    for (Size i = 0; i < n; ++i) {
+        Xnorm2(static_cast<Index>(i)) = X.row(static_cast<Index>(i)).squaredNorm();
+        Fnorm2(static_cast<Index>(i)) = F.row(static_cast<Index>(i)).squaredNorm();
+    }
+
+    // 1) Determine maximum bin index (one blocked pass).
+    long global_max_bin = 0;
+    Size nthreads = static_cast<Size>(std::max(1, omp_get_max_threads()));
+
     #pragma omp parallel
     {
         long local_max = 0;
-        #pragma omp for nowait schedule(static)
-        for (size_t i = 0; i < n; ++i) {
-            for (size_t j = 0; j < n; ++j) {
-                float sij = euclideanDistance(x[i], x[j]);
-                int binindex = static_cast<int>(std::floor(sij / h));
-                if (binindex < 0) binindex = 0;
-                if (binindex > local_max) local_max = binindex;
+        #pragma omp for schedule(static)
+        for (Size i0 = 0; i0 < n; i0 += block) {
+            Size i1 = std::min(n, i0 + block);
+            for (Size j0 = 0; j0 < n; j0 += block) {
+                Size j1 = std::min(n, j0 + block);
+
+                // Create Eigen block views (no copy)
+                auto A = X.block(static_cast<Index>(i0), 0, static_cast<Index>(i1 - i0), static_cast<Index>(dx_dim));
+                auto B = X.block(static_cast<Index>(j0), 0, static_cast<Index>(j1 - j0), static_cast<Index>(dx_dim));
+
+                // an and bn are temporary small vectors (block sized)
+                Eigen::VectorXd an = A.rowwise().squaredNorm();
+                Eigen::VectorXd bn = B.rowwise().squaredNorm();
+
+                // cross = A * B^T is expressed lazily; assign to matrix to evaluate.
+                Eigen::MatrixXd cross = A * B.transpose();
+
+                // compute distances and update local max bin
+                for (int ii = 0; ii < cross.rows(); ++ii) {
+                    for (int jj = 0; jj < cross.cols(); ++jj) {
+                        double sqd = an[ii] + bn[jj] - 2.0 * cross(ii, jj);
+                        if (sqd < 0.0 && sqd > -1e-12) sqd = 0.0;
+                        double sij = std::sqrt(sqd);
+                        int bin = static_cast<int>(std::floor(sij / h));
+                        if (bin < 0) bin = 0;
+                        if (bin > local_max) local_max = bin;
+                    }
+                }
             }
         }
         #pragma omp critical
-        { if (local_max > maxBin) maxBin = local_max; }
-    }
-    return static_cast<int>(maxBin);
-}
+        if (local_max > global_max_bin) global_max_bin = local_max;
+    } // end parallel
 
-std::vector<float> computeBprefix_openmp(const Dataset& x,
-                                         const FDataset& f,
-                                         size_t idxf,
-                                         double h,
-                                         std::function<float(const Point&, const Point&)> dx,
-                                         std::function<float(const Point&, const Point&)> dy)
-{
-    const size_t n = x.size();
-    if (n == 0) throw std::runtime_error("empty dataset x");
-    if (idxf >= f.size()) throw std::out_of_range("idxf out of range");
-    if (f[idxf].size() != n) throw std::runtime_error("f[idxf] size must equal x size");
-    if (h <= 0.0) throw std::invalid_argument("h must be > 0");
+    if (global_max_bin < 0) global_max_bin = 0;
+    Size bins = static_cast<Size>(global_max_bin) + 1;
 
-    // 1) find maximum bin index (so we can allocate fixed-size arrays)
-    int maxBin = compute_max_binindex(x, h);
-    const size_t bins = static_cast<size_t>(maxBin) + 1;
+    // 2) Thread-local maxima arrays (double precision for accumulation)
+    std::vector<std::vector<double>> localBs(nthreads, std::vector<double>(bins, 0.0));
 
-    // Global B initialized to 0
-    std::vector<float> B(bins, 0.0f);
-
-    int nthreads = omp_get_max_threads();
-    if (nthreads < 1) nthreads = 1;
-
-    // thread-local buffers: one vector per thread
-    std::vector<std::vector<float>> localBs(nthreads, std::vector<float>(bins, 0.0f));
-
-    // 2) parallel fill localB per thread
+    // 3) Blocked computation: for each block compute feature distances and spatial bins in a fused expression
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
-        auto &localB = localBs[tid];
+        auto &localB = localBs[static_cast<Size>(tid)];
 
         #pragma omp for schedule(static)
-        for (size_t i = 0; i < n; ++i) {
-            for (size_t j = 0; j < n; ++j) {
-                float sij = dx(x[i], x[j]);
-                float dij = dy(f[idxf][i], f[idxf][j]);
-                int binindex = static_cast<int>(std::floor(sij / h));
-                if (binindex < 0) binindex = 0;
-                // safe: each thread updates its own localB
-                if (localB[static_cast<size_t>(binindex)] < dij)
-                    localB[static_cast<size_t>(binindex)] = dij;
+        for (Size i0 = 0; i0 < n; i0 += block) {
+            Size i1 = std::min(n, i0 + block);
+            for (Size j0 = 0; j0 < n; j0 += block) {
+                Size j1 = std::min(n, j0 + block);
+
+                
+                auto XA = X.block(static_cast<Index>(i0), 0, static_cast<Index>(i1 - i0), static_cast<Index>(dx_dim));
+                auto XB = X.block(static_cast<Index>(j0), 0, static_cast<Index>(j1 - j0), static_cast<Index>(dx_dim));
+                auto FA = F.block(static_cast<Index>(i0), 0, static_cast<Index>(i1 - i0), static_cast<Index>(f_dim));
+                auto FB = F.block(static_cast<Index>(j0), 0, static_cast<Index>(j1 - j0), static_cast<Index>(f_dim));
+
+                // Block norms (small vectors)
+                Eigen::VectorXd an = XA.rowwise().squaredNorm();
+                Eigen::VectorXd bn = XB.rowwise().squaredNorm();
+                Eigen::VectorXd af = FA.rowwise().squaredNorm();
+                Eigen::VectorXd bf = FB.rowwise().squaredNorm();
+
+           
+                Eigen::MatrixXd crossX = XA * XB.transpose(); // spatial cross
+                Eigen::MatrixXd crossF = FA * FB.transpose(); // feature cross
+
+                // Now iterate over small block to compute sij and dij, update per-bin maxima.
+                for (int ii = 0; ii < crossF.rows(); ++ii) {
+                    for (int jj = 0; jj < crossF.cols(); ++jj) {
+                        double sqdF = af[ii] + bf[jj] - 2.0 * crossF(ii, jj);
+                        if (sqdF < 0.0 && sqdF > -1e-12) sqdF = 0.0;
+                        double dij = std::sqrt(sqdF);
+
+                        double sqdX = an[ii] + bn[jj] - 2.0 * crossX(ii, jj);
+                        if (sqdX < 0.0 && sqdX > -1e-12) sqdX = 0.0;
+                        double sij = std::sqrt(sqdX);
+
+                        int binindex = static_cast<int>(std::floor(sij / h));
+                        if (binindex < 0) binindex = 0;
+                        Size bidx = static_cast<Size>(binindex);
+                        if (bidx >= bins) bidx = bins - 1; // safety; shouldn't happen
+                        if (localB[bidx] < dij) localB[bidx] = dij;
+                    }
+                }
             }
         }
-    }
+    } // end parallel
 
-    // 3) merge localBs into global B using thread-safe max (single thread will do it)
-    for (int t = 0; t < nthreads; ++t) {
-        for (size_t b = 0; b < bins; ++b) {
+    // 4) Merge localBs into global B
+    std::vector<double> B(bins, 0.0);
+    for (Size t = 0; t < nthreads; ++t) {
+        for (Size b = 0; b < bins; ++b) {
             if (B[b] < localBs[t][b]) B[b] = localBs[t][b];
         }
     }
 
-    // 4) prefix max
+    // 5) compute prefix maxima and return as floats
     std::vector<float> Bprefix;
     if (!B.empty()) {
         Bprefix.reserve(B.size());
-        float runmax = B[0];
-        Bprefix.push_back(runmax);
-        for (size_t t = 1; t < B.size(); ++t) {
-            runmax = std::max(runmax, B[t]);
-            Bprefix.push_back(runmax);
+        double runmax = B[0];
+        Bprefix.push_back(static_cast<float>(runmax));
+        for (Size i = 1; i < B.size(); ++i) {
+            if (B[i] > runmax) runmax = B[i];
+            Bprefix.push_back(static_cast<float>(runmax));
         }
     }
     return Bprefix;
 }
 
-// C ABI wrapper 
 extern "C" {
 
 c_float* compute_bprefix_c(const c_double* x_data,
@@ -142,32 +209,8 @@ c_float* compute_bprefix_c(const c_double* x_data,
         if (n == 0) return nullptr;
         if (h <= 0.0) return nullptr;
 
-        // Reconstruct Dataset x from raw array (copy)
-        Dataset x;
-        x.reserve(n);
-        for (size_t i = 0; i < n; ++i) {
-            Point p;
-            p.reserve(dx_dim);
-            const c_double* base = x_data + i * dx_dim;
-            for (size_t d = 0; d < dx_dim; ++d) p.push_back(base[d]);
-            x.push_back(std::move(p));
-        }
-
-        // Reconstruct f as FDataset with a single feature-set f[0]
-        FDataset f;
-        f.emplace_back();
-        f[0].reserve(n);
-        for (size_t i = 0; i < n; ++i) {
-            Point p;
-            p.reserve(f_dim);
-            const c_double* base = f_data + i * f_dim;
-            for (size_t d = 0; d < f_dim; ++d) p.push_back(base[d]);
-            f[0].push_back(std::move(p));
-        }
-
-       
-
-        auto Bprefix = computeBprefix_openmp(x, f, 0, h, euclideanDistance, euclideanDistance);
+        // Call Eigen-based core (no copying into std::vector)
+        auto Bprefix = computeBprefix_eigen(x_data, n, dx_dim, f_data, f_dim, idxf, h);
 
         c_size len = Bprefix.size();
         if (len == 0) {
@@ -186,7 +229,7 @@ c_float* compute_bprefix_c(const c_double* x_data,
         return out;
 
     } catch (const std::exception& e) {
-        *out_len = 0;
+        if (out_len) *out_len = 0;
         return nullptr;
     }
 }
@@ -196,8 +239,8 @@ void free_buffer(c_float* buf) {
 }
 
 } // extern "C"
-#include <cstdio>
 
+#include <cstdio>
 extern "C" {
 void omp_debug_print() {
     #pragma omp parallel

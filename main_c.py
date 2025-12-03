@@ -8,7 +8,6 @@ import time #perf_counter() is safer
 from ctypes import c_double, c_size_t, c_float, POINTER, byref
 
 
-
 class EuclideanLSH:
     def __init__(self, dim, w=4.0, k=20, L=20, a=None, b=None):
         """
@@ -168,11 +167,11 @@ def call_compute_bprefix(x_np, f_np, h: float, idxf: int = 0):
 
 
 np.random.seed(0)
-dim = [10000, 512**2] 
-num_points = [10000,60000,80000]
+dim = [3600, 10000, 512**2] 
+num_points = [1000, 5000, 10000, 60000, 80000]
 dx=euclidean
 dy=euclidean
-max_dist = 50 #300 
+max_dist =50 #300 
 L=100
 K =10
 h=1
