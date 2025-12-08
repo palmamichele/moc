@@ -8,103 +8,10 @@ import time #perf_counter() is safer
 from ctypes import c_double, c_size_t, c_float, POINTER, byref
 
 
-class EuclideanLSH:
-    def __init__(self, dim, w=4.0, k=20, L=20, a=None, b=None):
-        """
-        LSH for Euclidean space.
-        dim: dimension of input vectors
-        w: bucket width
-        k: number of hash functions per hash table
-        L: number of hash tables
-        """
-        self.dim = dim
-        self.w = w
-        self.k = k
-        self.L = L
-        
-        self.a=a
-        if a==None:
-            self.a = [np.random.randn(k, dim) for _ in range(L)]
-        
-        self.b=b
-        if b==None:
-            self.b = [np.random.uniform(0, w, size=k) for _ in range(L)]
-        self.tables = [defaultdict(list) for _ in range(L)]
-
-    def _hash(self, x, i):
-        """Compute hash key for vector x in table i across k hashes"""
-        a = self.a[i]
-        b = self.b[i]
-        return tuple(np.floor((a @ x + b) / self.w).astype(int))
-    
-    def insert(self, vec, label):
-        """Insert a vector with given label into all hash tables."""
-        for l in range(self.L):
-            key = self._hash(vec, l)
-            self.tables[l][key].append((label, vec))#modify to just save pointer to original vector (or idx)
-    
-    def query(self, vec, m=1):
-        """Query m nearest candidates for given vector"""
-        candidates = set()
-        for l in range(self.L):
-            key = self._hash(vec, l)
-            for label, cand_vec in self.tables[l].get(key, []):
-                candidates.add((label, tuple(cand_vec)))
-
-        candidates = [ (label, np.linalg.norm(vec - np.array(cand_vec))) for label, cand_vec in candidates ]
-        candidates.sort(key=lambda x: x[1])
-        return candidates[:m]
-    
-    def rNN(self, r, x):
-        pairs = set()
-        for l in range(self.L):
-            for bucket in self.tables[l].values():
-                idxs = [label for label, _ in bucket]
-                for i in range(len(idxs)):
-                    for j in range(i + 1, len(idxs)):
-                        pairs.add(tuple(sorted((idxs[i], idxs[j])))) #to impose tuple order for the set, avoids adding same tuple
-
-        final_pairs = []
-        for i, j in pairs:
-            #this are only pairs from the same bucket
-            if np.linalg.norm(x[i] - x[j]) <= r:
-                final_pairs.append((i, j))
-        return final_pairs 
-    
-
-
-def eemoc(B,z):
-    #efficient exact moc
-    #we need to do line search in B up to bin z
-    mx = 0
-    searchSet = [i  for i in  B.keys() if i<= z]
-    for i in searchSet:
-        
-        mx = max(mx, B[i])
-    return mx
-
-    
-
-def moc(X,Y, dx, dy, t):
-    #assuming X, Y are metric spaces (discrete sets), 
-    #where Y[i] corresponds to function evaluated at X[i].
-    maxf=0
-    for i in range(len(X)):
-        for j in range(len(X)):
-            if dx(X[i],X[j])<=t:
-                maxf = max(maxf, dy(Y[i],Y[j]))
-    return maxf
-
-def annmoc(X,Y,dy):
-    #assuming X contains pairs of (indices of ) points at distance <= t
-    maxf=0
-    for i,j in X:
-        maxf = max(maxf, dy(Y[i],Y[j]))
-    return maxf
-
 
 def euclidean(x,y):
     return np.linalg.norm(x - y)
+
 def call_compute_bprefix(x_np, f_np, h: float, idxf: int = 0):
     """
     x_np: array-like shape (n, dx)
@@ -166,9 +73,12 @@ def call_compute_bprefix(x_np, f_np, h: float, idxf: int = 0):
     return np_result.tolist()
 
 
+
+
+
 np.random.seed(0)
-dim = [3600, 10000, 512**2] 
-num_points = [1000, 5000, 10000, 60000, 80000]
+dim = [100, 3600, 10000, 512**2, 200000] 
+num_points = [1000, 5000, 10000, 60000, 80000, 1000000]
 dx=euclidean
 dy=euclidean
 max_dist =50 #300 
@@ -180,8 +90,7 @@ num_functions = 3
 
 os.environ['OMP_NUM_THREADS'] = '14'   # pick desired number
 
-
-lib = ctypes.CDLL("./libbprefix.so")
+lib = ctypes.CDLL("./libcombined.dylib")
 lib.compute_bprefix_c.argtypes = [
     POINTER(c_double),  # x_data
     c_size_t,           # n
@@ -195,9 +104,27 @@ lib.compute_bprefix_c.argtypes = [
 lib.compute_bprefix_c.restype = POINTER(c_float)
 lib.free_buffer.argtypes = [POINTER(c_float)]
 lib.free_buffer.restype = None
-
-
 lib.omp_debug_print()
+
+lib.compute_lsh_moc_c.argtypes = [
+    POINTER(c_double),  # x_data
+    c_size_t,           # n
+    c_size_t,           # dx_dim
+    POINTER(c_double),  # f_data
+    c_size_t,           # f_dim
+    POINTER(c_double),  # a_data (L * K * dx_dim)
+    POINTER(c_double),  # b_data (L * K)
+    c_size_t,           # K
+    c_size_t,           # L
+    c_double,           # w (bucket width)
+    c_double,           # h (bin width)
+    POINTER(c_size_t)   # out_len
+]
+lib.compute_lsh_moc_c.restype = POINTER(c_float)
+lib.free_buffer_lsh.argtypes = [POINTER(c_float)]
+lib.free_buffer_lsh.restype = None
+
+
 
 def f1(x):
     return np.dot(2*np.ones_like(x), x)
@@ -217,12 +144,22 @@ for d in dim:
     a=[np.random.randn(K, d) for _ in range(L)]
     for n in num_points:
         x = [np.random.rand(d)*np.random.randint(-max_dist/2,max_dist/2) for _ in range(n)]
-        
 
         f=[[],[],[]]
         f[0] = [f1(x1) for x1 in x]
         f[1]=[f2(x1) for x1 in x]
         f[2]=[f3(x1) for x1 in x]
+        a_flat = np.ascontiguousarray(np.array([ai.reshape(-1) for ai in a]), dtype=np.float64).reshape(-1)
+        b_flat = np.ascontiguousarray(np.array([bi.reshape(-1) for bi in b]), dtype=np.float64).reshape(-1)
+        x_np = np.ascontiguousarray(np.vstack(x), dtype=np.float64)  # shape (n, d)
+
+        f_arrays = [np.ascontiguousarray(fj, dtype=np.float64).reshape(-1, 1) 
+            if np.ndim(fj)==1 else np.ascontiguousarray(fj, dtype=np.float64) 
+            for fj in f]
+        
+        a_ptr = a_flat.ctypes.data_as(POINTER(c_double))
+        b_ptr = b_flat.ctypes.data_as(POINTER(c_double))
+        x_ptr = x_np.reshape(-1).ctypes.data_as(POINTER(c_double))
 
 
         print(f'Ready {n}-{d}')
@@ -238,33 +175,59 @@ for d in dim:
 
         for experiment in range(1):
             t= np.arange(0, max_dist+1, h)
-            fmocs=[[],[],[]]
-            annfmocs=[[],[],[]]
+            fmocs=[[] for _ in range(num_functions)]
+            annfmocs = [[] for _ in range(num_functions)]
+            out_len = c_size_t(0)
             #aannfmocs=[[],[],[]]
             
             timesteps.append(time.time())
 
-        
-            for delta in t:
 
-                lsh = EuclideanLSH(dim=d, w=delta, k=K,L=L, a=a, b=b)
+            for j in range(num_functions):
+                f_ptr = f_arrays[j].reshape(-1).ctypes.data_as(POINTER(c_double))
                 
-                for i, vec in enumerate(x):
-                    lsh.insert(vec,i)
-                    
-                pairs = lsh.rNN(delta, x)
+                
+                B_lsh_ptr = lib.compute_lsh_moc_c(
+                    x_ptr,
+                    c_size_t(len(x)),
+                    c_size_t(x_np.shape[1]),
+                    f_ptr,
+                    c_size_t(f_arrays[j].shape[1]),
+                    a_ptr,
+                    b_ptr,
+                    c_size_t(K),
+                    c_size_t(L),
+                    c_double(max_dist),  # maximum delta range
+                    c_double(h),
+                    byref(out_len)
+                )
+                
+                if not bool(B_lsh_ptr) or out_len.value == 0:
+                    continue
+                
+                length = out_len.value
+                buf_type = ctypes.c_float * length
+                buf = ctypes.cast(B_lsh_ptr, POINTER(ctypes.c_float))
+                B_lsh_j = np.frombuffer(buf_type.from_address(ctypes.addressof(buf.contents)), dtype=np.float32).copy()
+                
+                lib.free_buffer_lsh(B_lsh_ptr)
+                
+                for delta in t:
+                    bin_index = int(np.floor(delta / h))
+                    fmocs[j].append(B[j][bin_index])
+                    val = 0.0
+                    if bin_index < len(B_lsh_j):
+                        val = B_lsh_j[bin_index]
+                    annfmocs[j].append(val)
 
-                for j in range(num_functions): #the number of functions
-                    annfmocs[j].append(annmoc(pairs,f[j],euclidean))
-                    timesteps.append(time.time())
-                    print(f"LSH rNN time for delta {delta}: {timesteps[-1] - timesteps[-2]} seconds")
-                    fmocs[j].append(B[j][int(np.floor(delta/h))])
-                    timesteps.append(time.time())
+            timesteps.append(time.time())
+            print(f"LSH rNN time: {timesteps[-1] - timesteps[-2]} seconds")
+
          
 
 
-            fig, ax = plt.subplots(3, 3, figsize=(8, 10))
 
+            fig, ax = plt.subplots(3, 3, figsize=(8, 10))
 
             for j in range(num_functions):
                 ax[j, 0].plot(t, fmocs[j], linestyle='None', marker='o', markersize=2, alpha=0.7)

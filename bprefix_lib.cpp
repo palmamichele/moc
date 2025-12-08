@@ -1,5 +1,4 @@
-//   g++ -O3 -std=c++17 -fopenmp -I /path/to/eigen bprefix_lib.cpp -o libbprefix.so
-
+// sketch code, adapt this to fmca library
 #include <cmath>
 #include <vector>
 #include <cstdlib>
