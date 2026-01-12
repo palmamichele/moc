@@ -7,3 +7,5 @@ include/
 
 *.so
 *.o
+
+data/

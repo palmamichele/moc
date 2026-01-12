@@ -239,6 +239,147 @@ void free_buffer(c_float* buf) {
 
 } // extern "C"
 
+
+
+// Compute maximum Euclidean distance between all points in X
+static double computeMaxDistance_eigen(const c_double* x_data, Size n, Size dx_dim, Size block = DEFAULT_BLOCK) {
+    if (!x_data || n == 0 || dx_dim == 0) return 0.0;
+
+    Eigen::Map<const MatrixR> X(x_data, static_cast<Index>(n), static_cast<Index>(dx_dim));
+    VectorR Xnorm2(n);
+    #pragma omp parallel for
+    for (Size i = 0; i < n; ++i) Xnorm2(static_cast<Index>(i)) = X.row(static_cast<Index>(i)).squaredNorm();
+
+    double global_max = 0.0;
+
+    #pragma omp parallel
+    {
+        double local_max = 0.0;
+        #pragma omp for schedule(static)
+        for (Size i0 = 0; i0 < n; i0 += block) {
+            Size i1 = std::min(n, i0 + block);
+            for (Size j0 = i0; j0 < n; j0 += block) { // symmetry, start at i0
+                Size j1 = std::min(n, j0 + block);
+
+                auto A = X.block(static_cast<Index>(i0), 0, static_cast<Index>(i1 - i0), static_cast<Index>(dx_dim));
+                auto B = X.block(static_cast<Index>(j0), 0, static_cast<Index>(j1 - j0), static_cast<Index>(dx_dim));
+
+                Eigen::VectorXd an = A.rowwise().squaredNorm();
+                Eigen::VectorXd bn = B.rowwise().squaredNorm();
+                Eigen::MatrixXd cross = A * B.transpose();
+
+                for (int ii = 0; ii < cross.rows(); ++ii) {
+                    for (int jj = 0; jj < cross.cols(); ++jj) {
+                        if (i0 + ii == j0 + jj) continue; // skip diagonal
+                        double sqd = an[ii] + bn[jj] - 2.0 * cross(ii, jj);
+                        if (sqd < 0.0 && sqd > -1e-12) sqd = 0.0;
+                        double d = std::sqrt(sqd);
+                        if (d > local_max) local_max = d;
+                    }
+                }
+            }
+        }
+        #pragma omp critical
+        if (local_max > global_max) global_max = local_max;
+    }
+    return global_max;
+}
+
+// Compute exact Lipschitz constant: max ||f_i - f_j|| / ||x_i - x_j||
+static double computeLipschitz_eigen(const c_double* x_data,
+                                     const c_double* f_data,
+                                     Size n,
+                                     Size dx_dim,
+                                     Size f_dim,
+                                     Size block = DEFAULT_BLOCK) {
+    if (!x_data || !f_data || n < 2 || dx_dim == 0 || f_dim == 0) return 0.0;
+
+    Eigen::Map<const MatrixR> X(x_data, static_cast<Index>(n), static_cast<Index>(dx_dim));
+    Eigen::Map<const MatrixR> F(f_data, static_cast<Index>(n), static_cast<Index>(f_dim));
+
+    VectorR Xnorm2(n), Fnorm2(n);
+    #pragma omp parallel for
+    for (Size i = 0; i < n; ++i) {
+        Xnorm2(static_cast<Index>(i)) = X.row(static_cast<Index>(i)).squaredNorm();
+        Fnorm2(static_cast<Index>(i)) = F.rowwise().squaredNorm()(i); // squaredNorm of f_i
+    }
+
+    double global_max = 0.0;
+
+    #pragma omp parallel
+    {
+        double local_max = 0.0;
+        #pragma omp for schedule(static)
+        for (Size i0 = 0; i0 < n; i0 += block) {
+            Size i1 = std::min(n, i0 + block);
+            for (Size j0 = i0 + 1; j0 < n; j0 += block) { // avoid i==j
+                Size j1 = std::min(n, j0 + block);
+
+                auto XA = X.block(static_cast<Index>(i0), 0, static_cast<Index>(i1 - i0), static_cast<Index>(dx_dim));
+                auto XB = X.block(static_cast<Index>(j0), 0, static_cast<Index>(j1 - j0), static_cast<Index>(dx_dim));
+                auto FA = F.block(static_cast<Index>(i0), 0, static_cast<Index>(i1 - i0), static_cast<Index>(f_dim));
+                auto FB = F.block(static_cast<Index>(j0), 0, static_cast<Index>(j1 - j0), static_cast<Index>(f_dim));
+
+                Eigen::VectorXd an = XA.rowwise().squaredNorm();
+                Eigen::VectorXd bn = XB.rowwise().squaredNorm();
+                Eigen::VectorXd af = FA.rowwise().squaredNorm();
+                Eigen::VectorXd bf = FB.rowwise().squaredNorm();
+
+                Eigen::MatrixXd crossX = XA * XB.transpose();
+                Eigen::MatrixXd crossF = FA * FB.transpose();
+
+                for (int ii = 0; ii < crossX.rows(); ++ii) {
+                    for (int jj = 0; jj < crossX.cols(); ++jj) {
+                        double sqdX = an[ii] + bn[jj] - 2.0 * crossX(ii, jj);
+                        if (sqdX <= 1e-12) continue; // skip too-close or identical points
+                        double dX = std::sqrt(sqdX);
+
+                        double sqdF = af[ii] + bf[jj] - 2.0 * crossF(ii, jj);
+                        if (sqdF < 0.0 && sqdF > -1e-12) sqdF = 0.0;
+                        double dF = std::sqrt(sqdF);
+
+                        double ratio = dF / dX;
+                        if (ratio > local_max) local_max = ratio;
+                    }
+                }
+            }
+        }
+        #pragma omp critical
+        if (local_max > global_max) global_max = local_max;
+    }
+
+    return global_max;
+}
+
+extern "C" {
+
+// Compute maximum Euclidean distance between all points
+c_double compute_max_distance_c(const c_double* x_data,
+                                c_size n,
+                                c_size dx_dim) {
+    try {
+        return computeMaxDistance_eigen(x_data, n, dx_dim);
+    } catch (...) {
+        return -1.0; // error
+    }
+}
+
+// Compute exact Lipschitz constant L = max ||f_i - f_j|| / ||x_i - x_j||
+c_double compute_lipschitz_c(const c_double* x_data,
+                              const c_double* f_data,
+                              c_size n,
+                              c_size dx_dim,
+                              c_size f_dim) {
+    try {
+        return computeLipschitz_eigen(x_data, f_data, n, dx_dim, f_dim);
+    } catch (...) {
+        return -1.0; // error
+    }
+}
+
+} // extern "C"
+
+
 #include <cstdio>
 extern "C" {
 void omp_debug_print() {
