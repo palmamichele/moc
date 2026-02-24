@@ -4,36 +4,39 @@
 2. [Usage](#usage)
 3. [License](#license)
 
-
 ## Installation
-To get started, clone this repository and ensure eigen library is available.
-Ensure clang with openMP support is enabled (e.g. from homebrew)
+To get started, clone this repository and install the required dependencies.
+
 
 ```bash
-cd moc
-clang++ -O3 -std=c++17 -Xpreprocessor -fopenmp -fPIC \
-  -I include/eigen \
-  -c bprefix_lib.cpp -o bprefix_lib.o
+git clone https://github.com/palmamichele/moc
+cd moc         
+```  
 
-clang++ -O3 -std=c++17 -Xpreprocessor -fopenmp -fPIC \
-  -I include/eigen \
-  -c lsh_moc.cpp -o lsh_moc.o
+Install pybind11
 
-
-clang++ -dynamiclib bprefix_lib.o lsh_moc.o \
-  -L/opt/homebrew/opt/libomp/lib -lomp \
-  -Wl,-rpath,/opt/homebrew/opt/libomp/lib \
-  -o libcombined.dylib
-```
-
-## Usage
 ```bash
-python main_c.py
+git clone https://github.com/pybind/pybind11
 ```
 
+Install Eigen (place in include the library: https://libeigen.gitlab.io)
+
+```bash
+mkdir include
+cd include
+```
+
+Ensure OpenMP is available in your compiler (e.g. g++)
 
 
+```bash
+mkdir build
+cd build
+cmake .. \
+  -DCMAKE_C_COMPILER=/opt/homebrew/bin/gcc-15 \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/bin/g++-15
+make     
+```  
 
-
-
-
+##Usage
+run data.py file

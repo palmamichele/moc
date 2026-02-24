@@ -4,6 +4,7 @@ venv/
 .vscode/
 main.dSYM/
 include/
+pybind11/
 
 *.so
 *.o
