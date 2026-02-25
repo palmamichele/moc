@@ -129,29 +129,29 @@ exactdmoc/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/exactdmoc.dir/build.make CMakeFiles/exactdmoc.dir/build
 .PHONY : exactdmoc/fast
 
-exact_moc.o: exact_moc.cpp.o
-.PHONY : exact_moc.o
+utils/exact_moc.o: utils/exact_moc.cpp.o
+.PHONY : utils/exact_moc.o
 
 # target to build an object file
-exact_moc.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/exactdmoc.dir/build.make CMakeFiles/exactdmoc.dir/exact_moc.cpp.o
-.PHONY : exact_moc.cpp.o
+utils/exact_moc.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/exactdmoc.dir/build.make CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o
+.PHONY : utils/exact_moc.cpp.o
 
-exact_moc.i: exact_moc.cpp.i
-.PHONY : exact_moc.i
+utils/exact_moc.i: utils/exact_moc.cpp.i
+.PHONY : utils/exact_moc.i
 
 # target to preprocess a source file
-exact_moc.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/exactdmoc.dir/build.make CMakeFiles/exactdmoc.dir/exact_moc.cpp.i
-.PHONY : exact_moc.cpp.i
+utils/exact_moc.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/exactdmoc.dir/build.make CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.i
+.PHONY : utils/exact_moc.cpp.i
 
-exact_moc.s: exact_moc.cpp.s
-.PHONY : exact_moc.s
+utils/exact_moc.s: utils/exact_moc.cpp.s
+.PHONY : utils/exact_moc.s
 
 # target to generate assembly for a file
-exact_moc.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/exactdmoc.dir/build.make CMakeFiles/exactdmoc.dir/exact_moc.cpp.s
-.PHONY : exact_moc.cpp.s
+utils/exact_moc.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/exactdmoc.dir/build.make CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.s
+.PHONY : utils/exact_moc.cpp.s
 
 # Help Target
 help:
@@ -162,9 +162,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... exactdmoc"
-	@echo "... exact_moc.o"
-	@echo "... exact_moc.i"
-	@echo "... exact_moc.s"
+	@echo "... utils/exact_moc.o"
+	@echo "... utils/exact_moc.i"
+	@echo "... utils/exact_moc.s"
 .PHONY : help
 
 

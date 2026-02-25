@@ -1,6 +1,6 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/exactdmoc.dir/exact_moc.cpp.o"
-  "CMakeFiles/exactdmoc.dir/exact_moc.cpp.o.d"
+  "CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o"
+  "CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o.d"
   "exactdmoc.cpython-314-darwin.so"
   "exactdmoc.pdb"
 )

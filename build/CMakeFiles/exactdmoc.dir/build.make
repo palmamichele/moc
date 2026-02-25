@@ -72,28 +72,28 @@ include CMakeFiles/exactdmoc.dir/flags.make
 CMakeFiles/exactdmoc.dir/codegen:
 .PHONY : CMakeFiles/exactdmoc.dir/codegen
 
-CMakeFiles/exactdmoc.dir/exact_moc.cpp.o: CMakeFiles/exactdmoc.dir/flags.make
-CMakeFiles/exactdmoc.dir/exact_moc.cpp.o: /Users/palmamichele/Documents/Research\ Projects/moc/code/moc/exact_moc.cpp
-CMakeFiles/exactdmoc.dir/exact_moc.cpp.o: CMakeFiles/exactdmoc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="/Users/palmamichele/Documents/Research Projects/moc/code/moc/build/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/exactdmoc.dir/exact_moc.cpp.o"
-	/opt/homebrew/bin/g++-15 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/exactdmoc.dir/exact_moc.cpp.o -MF CMakeFiles/exactdmoc.dir/exact_moc.cpp.o.d -o CMakeFiles/exactdmoc.dir/exact_moc.cpp.o -c "/Users/palmamichele/Documents/Research Projects/moc/code/moc/exact_moc.cpp"
+CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o: CMakeFiles/exactdmoc.dir/flags.make
+CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o: /Users/palmamichele/Documents/Research\ Projects/moc/code/moc/utils/exact_moc.cpp
+CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o: CMakeFiles/exactdmoc.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="/Users/palmamichele/Documents/Research Projects/moc/code/moc/build/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o"
+	/opt/homebrew/bin/g++-15 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o -MF CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o.d -o CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o -c "/Users/palmamichele/Documents/Research Projects/moc/code/moc/utils/exact_moc.cpp"
 
-CMakeFiles/exactdmoc.dir/exact_moc.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/exactdmoc.dir/exact_moc.cpp.i"
-	/opt/homebrew/bin/g++-15 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/Users/palmamichele/Documents/Research Projects/moc/code/moc/exact_moc.cpp" > CMakeFiles/exactdmoc.dir/exact_moc.cpp.i
+CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.i"
+	/opt/homebrew/bin/g++-15 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/Users/palmamichele/Documents/Research Projects/moc/code/moc/utils/exact_moc.cpp" > CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.i
 
-CMakeFiles/exactdmoc.dir/exact_moc.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/exactdmoc.dir/exact_moc.cpp.s"
-	/opt/homebrew/bin/g++-15 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/Users/palmamichele/Documents/Research Projects/moc/code/moc/exact_moc.cpp" -o CMakeFiles/exactdmoc.dir/exact_moc.cpp.s
+CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.s"
+	/opt/homebrew/bin/g++-15 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/Users/palmamichele/Documents/Research Projects/moc/code/moc/utils/exact_moc.cpp" -o CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.s
 
 # Object files for target exactdmoc
 exactdmoc_OBJECTS = \
-"CMakeFiles/exactdmoc.dir/exact_moc.cpp.o"
+"CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o"
 
 # External object files for target exactdmoc
 exactdmoc_EXTERNAL_OBJECTS =
 
-exactdmoc.cpython-314-darwin.so: CMakeFiles/exactdmoc.dir/exact_moc.cpp.o
+exactdmoc.cpython-314-darwin.so: CMakeFiles/exactdmoc.dir/utils/exact_moc.cpp.o
 exactdmoc.cpython-314-darwin.so: CMakeFiles/exactdmoc.dir/build.make
 exactdmoc.cpython-314-darwin.so: /opt/homebrew/Cellar/gcc/15.2.0_1/lib/gcc/current/libgomp.dylib
 exactdmoc.cpython-314-darwin.so: CMakeFiles/exactdmoc.dir/link.txt
