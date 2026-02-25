@@ -94,20 +94,33 @@ class ExactDiscreteModulusOfContinuity {
         //we discretize all pairwise distances into T bins of width d (the zero bin, contains zero distances)
         //e.g. d_x(i,j) belongs to bin z if zd<d_x(i,j)/d<=(z+1)d
 
-        //Thread-local maxima: reduce across threads with element-wise max.
-        for(int i=0; i<num_pairs;i++){
+        int num_threads = omp_get_max_threads();
+        
+        std::vector<Vector> B_local(num_threads, Vector::Zero(T));
 
-            // if (vec_P(i) <= d) {
-            //     bin_index =0;
-            // } else {
-            //     bin_index = static_cast<int>(std::ceil(vec_P(i) / d)) - 1;
-            // }
-            int bin_index = static_cast<int>(std::ceil(vec_P(i) / d));
-            
-            
-            B(bin_index) = std::max(B(bin_index),vec_f(i)); // at the end it will contain max f-distance for this bin (e.g. across  all points falling in i-th bin)
+        //std::cout << "using "<< num_threads << " threads";
+
+        //Thread-local maxima: reduce across threads with element-wise max.
+        #pragma omp parallel
+        {
+            int tid = omp_get_thread_num();
+
+            #pragma omp for
+            for(int i = 0; i < num_pairs; i++) {
+                int bin_index = static_cast<int>(std::ceil(vec_P(i) / d));
+                // Thread-local max
+                B_local[tid](bin_index) = std::max(B_local[tid](bin_index), vec_f(i));
+            }
         }
 
+        // Merge thread-local vectors into final B
+        for(int t = 0; t < T; t++) {
+            Scalar max_val = 0.0;
+            for(int thr = 0; thr < num_threads; thr++) {
+                max_val = std::max(max_val, B_local[thr](t));
+            }
+            B(t) = max_val;
+        }
 
         
         for(int i=1; i<T;i++){

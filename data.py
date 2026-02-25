@@ -76,3 +76,5 @@ for d in range(2,1000, 100):
         #np.allclose(a, b)
 
         #plot_mocs([m1,m1], [], t_values, )
+
+print("end")
