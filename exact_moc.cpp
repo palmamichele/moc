@@ -34,15 +34,16 @@ class ExactDiscreteModulusOfContinuity {
 
     }
 
-    Scalar computeMoc(const Matrix &P, const Matrix &f, const Scalar &t){
+    Scalar computeMoc(const Matrix &P, const Matrix &f, const Scalar &d){
         //this will make use of dx, dy initialized in init (we might cast the getMax function and re-use it here)
-
+        //computes moc exactly, for freely chosen delta value t
         Scalar d_max=0;
+
+        #pragma omp parallel for reduction(max : d_max)
         for (int i=0; i < P.cols();i++) {
-            
             for (int j=0; j<i;j++){
                 Scalar dis_x = dx(P.col(j),P.col(i));
-                if(dis_x<=t){
+                if(dis_x<=d){
                     Scalar dis_y = dy(f.col(j),f.col(i));
                     if (dis_y>d_max){
                         d_max = dis_y;
@@ -57,11 +58,13 @@ class ExactDiscreteModulusOfContinuity {
     }
 
     Vector computeMocPlot(const Matrix &P, const Matrix &f, const Scalar &d){
+        //assumes the delta_steps are evenly spaced (0, d, 2d,...)
         //d is the delta step in moc computation
-        int T = static_cast<int>(std::ceil((max_distance)/d))+1;  //ceil vs floor (guarantee an integer)
+        int T = static_cast<int>(std::ceil((max_distance)/d))+1;  //(guarantee an integer) 
         Vector t_values(T);
-
         Vector mocplot(T);
+        Vector B = Vector::Zero(T);; 
+
         mocplot(0)=0;
         t_values(0)=0;
 
@@ -69,15 +72,52 @@ class ExactDiscreteModulusOfContinuity {
             t_values(i)=t_values(i-1)+d;
         }
 
+        //first compute all pairwise distances
+        int num_pairs = P.cols()*(P.cols()+1)/2;
+        Vector vec_P(num_pairs);
+        Vector vec_f(num_pairs);
 
-        //openmp works on integer iteration variable loops
         #pragma omp parallel for
-        for(int i=1; i<T; i++){
-            mocplot(i) = computeMoc(P, f, t_values(i));
+        for (int i=0; i < P.cols();i++) {
+            for (int j=i; j< P.cols();j++){
+                int idx = i * P.cols() - (i * (i-1))/2 + (j - i);
+                Scalar dist_x = dx(P.col(j),P.col(i));
+                Scalar dist_y = dy(f.col(j),f.col(i));
+                
+                vec_P(idx)=dist_x;
+                vec_f(idx)=dist_y;
+                
+            }
+
         }
+
+        //we discretize all pairwise distances into T bins of width d (the zero bin, contains zero distances)
+        //e.g. d_x(i,j) belongs to bin z if zd<d_x(i,j)/d<=(z+1)d
+
+        //Thread-local maxima: reduce across threads with element-wise max.
+        for(int i=0; i<num_pairs;i++){
+
+            // if (vec_P(i) <= d) {
+            //     bin_index =0;
+            // } else {
+            //     bin_index = static_cast<int>(std::ceil(vec_P(i) / d)) - 1;
+            // }
+            int bin_index = static_cast<int>(std::ceil(vec_P(i) / d));
+            
+            
+            B(bin_index) = std::max(B(bin_index),vec_f(i)); // at the end it will contain max f-distance for this bin (e.g. across  all points falling in i-th bin)
+        }
+
+
+        
+        for(int i=1; i<T;i++){
+            mocplot(i) = std::max(mocplot(i-1), B(i));
+        }
+       
 
         return mocplot;
     }
+
 
 
 

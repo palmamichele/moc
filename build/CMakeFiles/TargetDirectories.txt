@@ -1,0 +1,5 @@
+/Users/palmamichele/Documents/Research Projects/moc/code/moc/build/CMakeFiles/exactdmoc.dir
+/Users/palmamichele/Documents/Research Projects/moc/code/moc/build/CMakeFiles/edit_cache.dir
+/Users/palmamichele/Documents/Research Projects/moc/code/moc/build/CMakeFiles/rebuild_cache.dir
+/Users/palmamichele/Documents/Research Projects/moc/code/moc/build/pybind11/CMakeFiles/edit_cache.dir
+/Users/palmamichele/Documents/Research Projects/moc/code/moc/build/pybind11/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,1 @@
+/opt/homebrew/bin/g++-15  -arch arm64 -bundle -Wl,-headerpad_max_install_names -L/opt/homebrew/opt/llvm/lib -Wl,-undefined,dynamic_lookup -o exactdmoc.cpython-314-darwin.so CMakeFiles/exactdmoc.dir/exact_moc.cpp.o  /opt/homebrew/Cellar/gcc/15.2.0_1/lib/gcc/current/libgomp.dylib

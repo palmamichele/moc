@@ -26,6 +26,9 @@ mkdir include
 cd include
 ```
 
+Create a virtual environment using homebrew Python 3.14.3
+
+
 Ensure OpenMP is available in your compiler (e.g. g++)
 
 

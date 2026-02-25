@@ -1,15 +1,14 @@
 cmake_minimum_required(VERSION 3.12)
 
-#set(CMAKE_C_COMPILER clang)
-#set(CMAKE_CXX_COMPILER clang++)
-
 project(pybind_vid)
 
 add_subdirectory(pybind11)
 pybind11_add_module(exactdmoc exact_moc.cpp)
 
-set(EIGEN3_INCLUDE_DIR "/Users/palmamichele/Documents/Research Projects/mocnn/newcode/include/eigen")
+
+set(EIGEN3_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include/eigen")
 target_include_directories(exactdmoc PRIVATE ${EIGEN3_INCLUDE_DIR})
+
 
 set(CMAKE_CXX_STANDARD 17)
 
