@@ -13,33 +13,41 @@ git clone https://github.com/palmamichele/moc
 cd moc         
 ```  
 
-Install pybind11
+Install pybind11 (sugg. via homebrew )
 
 ```bash
-git clone https://github.com/pybind/pybind11
+brew install pybind11
 ```
 
-Install Eigen (place in include the library: https://libeigen.gitlab.io)
+Install Eigen (sugg. via homebrew)
 
 ```bash
-mkdir include
-cd include
+brew install eigen
 ```
 
-Create a virtual environment using homebrew Python 3.14.3
+Ensure OpenMP is available in your compiler configured in CMAKE (e.g. g++)
+```bash
+export CC=/opt/homebrew/bin/gcc-15  
+export CXX=/opt/homebrew/bin/g++-15
+```
 
 
-Ensure OpenMP is available in your compiler (e.g. g++)
+Clone FMCA in the project folder (https://github.com/muchip/fmca.git) and set the branch
+```bash
+git clone https://github.com/muchip/fmca.git
+cd fmca
+git checkout DD 
+```
 
 
+Compile FMCA following FMCA README.md 
 ```bash
 mkdir build
 cd build
-cmake .. \
-  -DCMAKE_C_COMPILER=/opt/homebrew/bin/gcc-15 \
-  -DCMAKE_CXX_COMPILER=/opt/homebrew/bin/g++-15
+cmake -DCMAKE_BUILD_TYPE=Release ../
 make     
 ```  
 
+
 ##Usage
-run data.py file
+run moc/moc_ECLIPSE.py file
