@@ -8,12 +8,8 @@ import matplotlib.pyplot as plt
 sys.path.append("fmca/build/py")
 import FMCA
 
-# Test
-moc = FMCA.ExactDiscreteModulusOfContinuity()
-
-print(moc)
-
-exit()
+dmoc = FMCA.ExactDiscreteModulusOfContinuity()
+epsmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
 
 #usage
 # edmoc = FMCA.ExactDiscreteModulusOfContinuity()
@@ -21,10 +17,34 @@ exit()
 # edmoc.computeMocPlot(x, f1, delta_step)
 # m1 = edmoc.getOmegaT()
 
+
+#usage
+# delta_step = 1
+# r = 0.0005
+# R = 2
+# TX = len(m1)
+# min_csize=1
+
+# edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
+# edmoc.init(x,f1,r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN")
+
+# e1=[]
+# t_values = np.zeros(TX,dtype=np.float64)
+# for i in range(1, len(t_values)):
+#     t_values[i]=t_values[i-1]+delta_step
+
+
+# for t in t_values:
+#     e1.append(edmoc.omega(t,x,f1))
+
+
+
+
 def plot_mocs(fmocs, lshmocs, deltas, savename):
     """
     mocs contains moc values (from 0 to >= max_dist) for k different functions, it is an array of size k x T
     """
+
 
     num_functions = len(fmocs)
     fig, ax = plt.subplots(num_functions, 2)
@@ -32,18 +52,22 @@ def plot_mocs(fmocs, lshmocs, deltas, savename):
     for j in range(num_functions):
         ax[j,0].plot(deltas, fmocs[j], linestyle='None', marker='o', markersize=2, alpha=0.7)
         ax[j,0].set_title(f"exact MOC for f{j}")
+        ax[j, 1].set_title(f"epsilon moc for f{j}")
         if lshmocs ==[]:
 
             ax[j, 1].plot(deltas, deltas*0, linestyle='None', marker='o', markersize=2, alpha=0.7)
-            ax[j, 1].set_title(f"lsh moc for f{j}")
-        #ax[j, 2].plot(t, aannfmocs[j], linestyle='None', marker='o', markersize=2, alpha=0.7)
-        #ax[j, 2].set_title(f"aANN MOC for f{j}")
+            
+            
+
+        else:
+            ax[j,1].plot(deltas, lshmocs[j], linestyle='None', marker='o', markersize=2, alpha=0.7)
+           
 
     fig.tight_layout()
-    plt.savefig(f"{savename}", dpi=300)  # high-resolution PNG
+    #plt.savefig(f"{savename}", dpi=300)  # high-resolution PNG
+    plt.show()
     plt.clf() 
     plt.close('all')
-
 
 def lipschitz_from_fmoc(fmocs, deltas):
     fmocs = np.asarray(fmocs)
@@ -56,7 +80,6 @@ neurons = [100,200,300,400]#[1,128]#[1, 20, 50] #[100, 200, 300, 400]
 
 parent= "/Users/palmamichele/Documents/Research Projects/moc/code/moc/data"
 
-
 total_files = 0
 smaller_eclipse = {"":0,"_train":0,"_test":0}
 smaller_eclipse_fast = {"":0,"_train":0,"_test":0}
@@ -65,10 +88,16 @@ greater_eclipse_fast = {"":0,"_train":0,"_test":0}
 greater_eclipse_files = []
 greater_eclipse_fast_files = []
 
-
 worst_ratio_trivial=[-1]
 worst_ratio_eclipse=[-1]
 worst_ratio_eclipse_fast=[-1]
+
+
+r = 0.0005
+R = 2
+min_csize=1
+
+
 
 for l in lyrs:
     for n in neurons:
@@ -146,26 +175,50 @@ for l in lyrs:
                 ydataset=F_test
 
             delta_step=1
-            start_time = time.time()  # start timer
-
-            edmoc = exactdmoc.ExactDiscreteModulusOfContinuity()
-            edmoc.init(xdataset,ydataset[0])    
-            m1 = edmoc.computeMocPlot(xdataset, ydataset[0], delta_step)
-            elapsed = time.time() - start_time  # compute elapsed time
-            print("required "+str(elapsed)+" on "+str(type))
-            m2 = edmoc.computeMocPlot(xdataset, ydataset[1], delta_step)
-
+            dmoc.init(xdataset,ydataset[0], 0, "EUCLIDEAN", "EUCLIDEAN", "NO")
+            dmoc.computeMocPlot(xdataset, ydataset[0], delta_step)
+            m1 = dmoc.getOmegaT()
+            
+            TX = len(m1)
             #reconstruct values of t_values, having the size of mocplot
-            t_values = np.zeros(len(m1),dtype=np.float64)
-
-            for i in range(1, len(t_values)):
+            t_values = np.zeros(TX,dtype=np.float64)
+            for i in range(1, TX):
                 t_values[i]=t_values[i-1]+delta_step
 
-            plot_mocs([m1,m2], [], t_values,  os.path.join(savename, f"{type}NEWmoc.png"))
+
+
+            edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
+            edmoc.init(xdataset,ydataset[0],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN")
+            e1=[]
+            for t in t_values:
+                e1.append(edmoc.omega(t,xdataset,ydataset[0]))
+
+
+            start_time = time.time()  # start timer for fair comparison
+            dmoc.init(xdataset,ydataset[1], len(m1), "EUCLIDEAN", "EUCLIDEAN", "NO")
+            dmoc.computeMocPlot(xdataset, ydataset[1], delta_step)
+            m2 = dmoc.getOmegaT()
+            elapsed = time.time() - start_time  # compute elapsed time
+            print("exact moc required "+str(elapsed)+" on "+str(type))
+
+            start_time = time.time()  # start timer for fair comparison
+            edmoc.init(xdataset,ydataset[1],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN")
+            e2=[]
+            for t in t_values:
+                e2.append(edmoc.omega(t,xdataset,ydataset[1]))
+            elapsed = time.time() - start_time  # compute elapsed time
+            print("epsilon moc required "+str(elapsed)+" on "+str(type))
+
+
+            plot_mocs([m1,m2], [e1, e2], t_values,  os.path.join(savename, f"{type}NEWmoc.png"))
 
             L = lipschitz_from_fmoc(m1, t_values)
 
-            print(L)
+            print(L, "from exact")
+
+            L = lipschitz_from_fmoc(e1, t_values)
+
+            print(L, "from epsilon")
 
             with open(file_path, mode="a", newline="") as f:
                 writer = csv.writer(f)
