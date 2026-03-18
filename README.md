@@ -26,7 +26,7 @@ export CC=/opt/homebrew/bin/gcc-15
 export CXX=/opt/homebrew/bin/g++-15
 ```
 
-Clone FMCA and set the branch
+Clone FMCA and set the DD branch (3487dad)
 ```bash
 git clone https://github.com/muchip/fmca.git
 cd fmca
@@ -44,35 +44,22 @@ cd ..
 ```  
 
 
-
-
 ```bash
 git clone https://github.com/palmamichele/moc
-cd moc/include       
+cd moc
+mv ../fmca .    
 ```  
-
-Clone csv parser 
-```bash
-git clone https://github.com/d99kris/rapidcsv.git   
-```  
-
-
 
 
 
 ##Build in moc project folder
 ```bash
-cd ..
 mkdir build
 cd build
 cmake ..
 make     
 ```  
 
-##Usage
-```bash
-./moc   
-```  
-
+## Usage
 for python see 
 moc/moc_ECLIPSE.py file

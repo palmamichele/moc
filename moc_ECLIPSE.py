@@ -8,14 +8,13 @@ import matplotlib.pyplot as plt
 sys.path.append("fmca/build/py")
 import FMCA
 
-dmoc = FMCA.DiscreteModulusOfContinuity()
-epsmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
+
 
 print(os.environ.get("OMP_NUM_THREADS"))
 
 parent= "/Users/palmamichele/Documents/Research Projects/moc/code/moc/data"
 
-use_lsh=True
+
 
 #usage
 # edmoc = FMCA.ExactDiscreteModulusOfContinuity()
@@ -95,10 +94,6 @@ worst_ratio_eclipse_fast=[-1]
 
 how_many=10000
 delta_step=1
-r = delta_step
-
-R = 2
-min_csize=1
 
 
 
@@ -140,33 +135,40 @@ for l in lyrs:
             print("F0 shape:", F[0].shape)
 
 
-            filename = os.path.join(savename, "F_1.csv")
-            F[1]= np.loadtxt(filename, delimiter=",")
-            F[1] = F[1][:how_many]
+            # filename = os.path.join(savename, "F_1.csv")
+            # F[1]= np.loadtxt(filename, delimiter=",")
+            # F[1] = F[1][:how_many]
 
-            F[1] = F[1].reshape(-1, 1)
-            F[1] = F[1].transpose()
+            # F[1] = F[1].reshape(-1, 1)
+            # F[1] = F[1].transpose()
 
-
+            dmoc = FMCA.DiscreteModulusOfContinuity()
+            edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
+            lshmoc = FMCA.LSHDiscreteModulusOfContinuity()
            
+            max_distance = 20
+
             print("start exact moc")
             start_time = time.time()  # start timer for fair comparison
-            dmoc.init(X,F[0], 0, "EUCLIDEAN", "EUCLIDEAN", "NO")
-            dmoc.computeMocPlot(X, F[0], delta_step)
-            m1 = dmoc.getOmegaT()
+            dmoc.init(X,F[0], max_distance, delta_step, "EUCLIDEAN", "EUCLIDEAN")
+            #dmoc.computeMocPlot(X, F[0], delta_step)
+            m1 = dmoc.omegat()
+            print(m1)
             elapsed = time.time() - start_time  # compute elapsed time
             print("took (sec) ", elapsed)
-            TX = dmoc.getTX()
+           
             #reconstruct values of t_values, having the size of mocplot
-            t_values = dmoc.getTGrid()
+            t_values = dmoc.tgrid()
+            TX = max_distance
+        
 
             print("start epsilon lsh moc")
             start_time = time.time()  # start timer for fair 
-            edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
-            edmoc.init(X,F[0],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN", True, use_lsh)
+            lshmoc = FMCA.LSHDiscreteModulusOfContinuity()
+            lshmoc.init(X,F[0],TX, delta_step)
             e1_lsh =[]
             for t in t_values:
-                e1_lsh.append(edmoc.omega(t,X,F[0]))
+                e1_lsh.append(lshmoc.omega(t,X,F[0]))
 
             elapsedEPSLSH = time.time() - start_time  # compute 
             print("took (sec) ", elapsedEPSLSH)
@@ -175,7 +177,7 @@ for l in lyrs:
             print("start epsilon moc")
             start_time = time.time()  # start timer for fair 
             edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
-            edmoc.init(X,F[0],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN")
+            edmoc.init(X,F[0],TX, delta_step)
             e1=[]
             e1 = [edmoc.omega(t,X,F[0]) for t in t_values]
 
@@ -184,17 +186,8 @@ for l in lyrs:
             
         
 
-            print("start exact lsh moc")
-            start_time = time.time()  # start timer for fair comparison
-            dmoc.init(X,F[0], 0, "EUCLIDEAN", "EUCLIDEAN", "NO", True)
 
-            m1_lsh = [dmoc.getOmega(X, F[0], t) for t in t_values]
-
-            elapsedLSH= time.time() - start_time  # compute elapsed time
-            print("took (sec) ", elapsedLSH)
-
-
-            plot_mocs(m1, e1, m1_lsh, e1_lsh, t_values,  os.path.join(savename, f"{type, how_many}latest_MOC.png"))
+            plot_mocs(m1, e1, [], e1_lsh, t_values,  os.path.join(savename, f"{type, how_many}refact_MOC.png"))
 
             L = lipschitz_from_fmoc(m1, t_values)
 
@@ -204,9 +197,6 @@ for l in lyrs:
 
             print(L, "from epsilon")
 
-            L = lipschitz_from_fmoc(m1_lsh, t_values)
-
-            print(L, "from exact lsh")
 
             L = lipschitz_from_fmoc(e1_lsh, t_values)
 
@@ -218,23 +208,22 @@ for l in lyrs:
                 writer.writerow([
                     "L from exact moc",
                     "L from epsilon moc",
-                    "L from exact lsh moc",
                     "L from epsilon lsh moc",
                     "time (secs) for exact moc",
                     "time for epsilon moc",
-                    "time for exact lsh moc",
                     "time for epsilon lsh"
                 ])
 
                 writer.writerow([
                 lipschitz_from_fmoc(m1, t_values),
                     lipschitz_from_fmoc(e1, t_values),
-                    lipschitz_from_fmoc(m1_lsh, t_values),
+                    lipschitz_from_fmoc(e1_lsh, t_values),
                     elapsed,
                     elapsedEps,
-                    elapsedLSH,
                     elapsedEPSLSH
                 ])
+
+
 
 
 
@@ -335,30 +324,33 @@ for l in lyrs:
                 ydataset=F_test
 
             delta_step=1
-            r = delta_step
+            dmoc = FMCA.DiscreteModulusOfContinuity()
+            lshmoc = FMCA.LSHDiscreteModulusOfContinuity()
 
             print("start exact moc")
             start_time = time.time()  # start timer for fair comparison
-            dmoc.init(xdataset,ydataset[0], 0, "EUCLIDEAN", "EUCLIDEAN", "NO")
-            dmoc.computeMocPlot(xdataset, ydataset[0], delta_step)
-            m1 = dmoc.getOmegaT()
+            dmoc.init(xdataset,ydataset[0], 0, delta_step,"EUCLIDEAN", "EUCLIDEAN")
+            m1 = dmoc.omegat()
             elapsed = time.time() - start_time  # compute elapsed time
             print("took (sec) ", elapsed)
-            TX = dmoc.getTX()
+            
             #reconstruct values of t_values, having the size of mocplot
-            t_values = dmoc.getTGrid()
+            t_values = dmoc.tgrid()
+            TX = len(t_values)
+
 
 
             print("start epsilon lsh moc")
             start_time = time.time()  # start timer for fair 
-            edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
-            edmoc.init(X,F[0],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN", False, use_lsh)
+            lshmoc = FMCA.LSHDiscreteModulusOfContinuity()
+            lshmoc.init(xdataset,ydataset[0], TX, delta_step)
             e1_lsh =[]
             for t in t_values:
-                e1_lsh.append(edmoc.omega(t,X,F[0]))
+                e1_lsh.append(lshmoc.omega(t,xdataset,ydataset[0]))
 
             elapsedEPSLSH = time.time() - start_time  # compute 
-            print("took (sec) ", elapsed)
+            print("took (sec) ", elapsedEPSLSH)
+           
 
             # print("start epsilon moc")
             # start_time = time.time()  # start timer for fair 
@@ -373,29 +365,13 @@ for l in lyrs:
            
 
 
-            print("start exact lsh moc")
-            start_time = time.time()  # start timer for fair comparison
-            dmoc.init(xdataset,ydataset[0], 0, "EUCLIDEAN", "EUCLIDEAN", "NO", True)
 
-            m1_lsh = [dmoc.getOmega(xdataset, ydataset[0], t) for t in t_values]
-
-            elapsedLSH= time.time() - start_time  # compute elapsed time
-            print("took (sec) ", elapsedLSH)
-
-
-            plot_mocs(m1, [], m1_lsh, e1_lsh, t_values,  os.path.join(savename, f"{type, how_many}latest_MOC.png"))
+            plot_mocs(m1, [], [], e1_lsh, t_values,  os.path.join(savename, f"{type, how_many}refact_MOC.png"))
 
             L = lipschitz_from_fmoc(m1, t_values)
 
             print(L, "from exact")
 
-            L = lipschitz_from_fmoc(e1, t_values)
-
-            print(L, "from epsilon")
-
-            L = lipschitz_from_fmoc(m1_lsh, t_values)
-
-            print(L, "from exact lsh")
 
             L = lipschitz_from_fmoc(e1_lsh, t_values)
 
@@ -407,7 +383,6 @@ for l in lyrs:
                 writer.writerow([
                     "L from exact moc",
                     #"L from epsilon moc",
-                    "L from exact lsh moc",
                     "L from epsilon lsh moc",
                     "time (secs) for exact moc",
                     #"time from epsilon moc",
@@ -418,11 +393,9 @@ for l in lyrs:
                 writer.writerow([
                 lipschitz_from_fmoc(m1, t_values),
                     #lipschitz_from_fmoc(e1, t_values),
-                    lipschitz_from_fmoc(m1_lsh, t_values),
                     lipschitz_from_fmoc(e1_lsh, t_values),
                     elapsed,
                     elapsedEPSLSH,
-                    elapsedLSH
                 ])
 
 
