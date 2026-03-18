@@ -1,16 +1,11 @@
 cmake_minimum_required(VERSION 3.12)
-
-project(pybind_vid)
-
-add_subdirectory(pybind11)
-pybind11_add_module(moc 
-src/exact_moc.cpp
-src/heur_moc.cpp
-)
+project(MOC CXX)
 
 
-set(EIGEN3_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include/eigen")
-target_include_directories(exactdmoc PRIVATE ${EIGEN3_INCLUDE_DIR})
+add_executable(moc mnist_moc.cpp)
+
+find_package(Eigen3 REQUIRED)
+target_link_libraries(moc PRIVATE Eigen3::Eigen)
 
 
 set(CMAKE_CXX_STANDARD 17)
@@ -20,6 +15,5 @@ if(OpenMP_CXX_FOUND)
      target_link_libraries(moc PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
-set(FMCA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include/fmca")
-target_include_directories(moc PRIVATE ${FMCA_INCLUDE_DIR})
 
+target_include_directories(moc PRIVATE ${CMAKE_SOURCE_DIR}/rapidcsv)

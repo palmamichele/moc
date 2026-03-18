@@ -8,8 +8,14 @@ import matplotlib.pyplot as plt
 sys.path.append("fmca/build/py")
 import FMCA
 
-dmoc = FMCA.ExactDiscreteModulusOfContinuity()
+dmoc = FMCA.DiscreteModulusOfContinuity()
 epsmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
+
+print(os.environ.get("OMP_NUM_THREADS"))
+
+parent= "/Users/palmamichele/Documents/Research Projects/moc/code/moc/data"
+
+use_lsh=True
 
 #usage
 # edmoc = FMCA.ExactDiscreteModulusOfContinuity()
@@ -40,32 +46,27 @@ epsmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
 
 
 
-def plot_mocs(fmocs, lshmocs, deltas, savename):
+def plot_mocs(exactMoc, epsilonMoc, lshMoc, lshEpsilon, deltas, savename):
     """
     mocs contains moc values (from 0 to >= max_dist) for k different functions, it is an array of size k x T
     """
 
+    if exactMoc!=[]:
+        plt.plot(deltas, exactMoc, label = "exact", linestyle='None', marker='o', markersize=2, alpha=0.7)
 
-    num_functions = len(fmocs)
-    fig, ax = plt.subplots(num_functions, 2)
+    if epsilonMoc!=[]:
+        plt.plot(deltas, epsilonMoc, label = "epsilon", linestyle='None', marker='o', markersize=2, alpha=0.7)
 
-    for j in range(num_functions):
-        ax[j,0].plot(deltas, fmocs[j], linestyle='None', marker='o', markersize=2, alpha=0.7)
-        ax[j,0].set_title(f"exact MOC for f{j}")
-        ax[j, 1].set_title(f"epsilon moc for f{j}")
-        if lshmocs ==[]:
+    if lshMoc!=[]:
+        plt.plot(deltas, lshMoc, label = "lsh", linestyle='None', marker='o', markersize=2, alpha=0.7)  
+    
+    if lshEpsilon!=[]:
+        plt.plot(deltas, lshEpsilon, label = "epsilon lsh", linestyle='None', marker='o', markersize=2, alpha=0.7)
 
-            ax[j, 1].plot(deltas, deltas*0, linestyle='None', marker='o', markersize=2, alpha=0.7)
-            
-            
-
-        else:
-            ax[j,1].plot(deltas, lshmocs[j], linestyle='None', marker='o', markersize=2, alpha=0.7)
-           
-
-    fig.tight_layout()
-    #plt.savefig(f"{savename}", dpi=300)  # high-resolution PNG
-    plt.show()
+    plt.legend()
+    plt.xlabel("t")
+    plt.ylabel("omega(t)")
+    plt.savefig(f"{savename}", dpi=300)  # high-resolution PNG
     plt.clf() 
     plt.close('all')
 
@@ -75,10 +76,170 @@ def lipschitz_from_fmoc(fmocs, deltas):
     mask = deltas > 0          # safety
     return np.max(fmocs[mask] / deltas[mask])
 
+
+lyrs = [2, 20, 100]#[2, 5, 10, 20, 30, 50, 75, 100]
+neurons = [20,100] #[20, 40, 60, 80, 100]
+
+total_files=0
+count_smaller_than_eclipse=0
+count_smaller_than_eclipse_fast=0
+count_greater_than_eclipse=0
+count_greater_than_eclipse_fast=0
+greater_eclipse_files = []
+greater_eclipse_fast_files = []
+
+worst_ratio_trivial=[-1]
+worst_ratio_eclipse=[-1]
+worst_ratio_eclipse_fast=[-1]
+
+
+how_many=10000
+delta_step=1
+r = delta_step
+
+R = 2
+min_csize=1
+
+
+
+for l in lyrs:
+    for n in neurons:
+        savename = os.path.join(parent, f"simplenet-{n}-{l}")
+
+        if not(os.path.isdir(savename)):
+            continue
+        total_files += 1
+
+        print("processing ", savename)
+
+        filename = os.path.join(savename, "X.csv")
+
+
+        for how_many in range(10000,80000,10000):
+
+            X = np.loadtxt(filename, delimiter=",")
+
+            print(X.shape)
+            if X.ndim == 1:
+                break
+
+            how_many = min(how_many, 70000)
+
+            X = X[:how_many,:]
+
+            X = X.transpose()
+
+            F = [[],[]]
+            filename = os.path.join(savename, "F_0.csv")
+            F[0]= np.loadtxt(filename, delimiter=",")
+            F[0] = F[0][:how_many]
+            F[0] = F[0].reshape(-1, 1)
+            F[0] = F[0].transpose()
+
+            print("X shape:", X.shape)
+            print("F0 shape:", F[0].shape)
+
+
+            filename = os.path.join(savename, "F_1.csv")
+            F[1]= np.loadtxt(filename, delimiter=",")
+            F[1] = F[1][:how_many]
+
+            F[1] = F[1].reshape(-1, 1)
+            F[1] = F[1].transpose()
+
+
+           
+            print("start exact moc")
+            start_time = time.time()  # start timer for fair comparison
+            dmoc.init(X,F[0], 0, "EUCLIDEAN", "EUCLIDEAN", "NO")
+            dmoc.computeMocPlot(X, F[0], delta_step)
+            m1 = dmoc.getOmegaT()
+            elapsed = time.time() - start_time  # compute elapsed time
+            print("took (sec) ", elapsed)
+            TX = dmoc.getTX()
+            #reconstruct values of t_values, having the size of mocplot
+            t_values = dmoc.getTGrid()
+
+            print("start epsilon lsh moc")
+            start_time = time.time()  # start timer for fair 
+            edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
+            edmoc.init(X,F[0],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN", True, use_lsh)
+            e1_lsh =[]
+            for t in t_values:
+                e1_lsh.append(edmoc.omega(t,X,F[0]))
+
+            elapsedEPSLSH = time.time() - start_time  # compute 
+            print("took (sec) ", elapsedEPSLSH)
+
+    
+            print("start epsilon moc")
+            start_time = time.time()  # start timer for fair 
+            edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
+            edmoc.init(X,F[0],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN")
+            e1=[]
+            e1 = [edmoc.omega(t,X,F[0]) for t in t_values]
+
+            elapsedEps = time.time() - start_time  # compute 
+            print("took (sec) ", elapsedEps)
+            
+        
+
+            print("start exact lsh moc")
+            start_time = time.time()  # start timer for fair comparison
+            dmoc.init(X,F[0], 0, "EUCLIDEAN", "EUCLIDEAN", "NO", True)
+
+            m1_lsh = [dmoc.getOmega(X, F[0], t) for t in t_values]
+
+            elapsedLSH= time.time() - start_time  # compute elapsed time
+            print("took (sec) ", elapsedLSH)
+
+
+            plot_mocs(m1, e1, m1_lsh, e1_lsh, t_values,  os.path.join(savename, f"{type, how_many}latest_MOC.png"))
+
+            L = lipschitz_from_fmoc(m1, t_values)
+
+            print(L, "from exact")
+
+            L = lipschitz_from_fmoc(e1, t_values)
+
+            print(L, "from epsilon")
+
+            L = lipschitz_from_fmoc(m1_lsh, t_values)
+
+            print(L, "from exact lsh")
+
+            L = lipschitz_from_fmoc(e1_lsh, t_values)
+
+            print(L, "from epsilon lsh")
+
+            summary_csv = os.path.join(savename, str(how_many)+"summary_F0.csv")
+            with open(summary_csv, mode="w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    "L from exact moc",
+                    "L from epsilon moc",
+                    "L from exact lsh moc",
+                    "L from epsilon lsh moc",
+                    "time (secs) for exact moc",
+                    "time for epsilon moc",
+                    "time for exact lsh moc",
+                    "time for epsilon lsh"
+                ])
+
+                writer.writerow([
+                lipschitz_from_fmoc(m1, t_values),
+                    lipschitz_from_fmoc(e1, t_values),
+                    lipschitz_from_fmoc(m1_lsh, t_values),
+                    elapsed,
+                    elapsedEps,
+                    elapsedLSH,
+                    elapsedEPSLSH
+                ])
+
+
+
 lyrs = [3] 
 neurons = [100,200,300,400]#[1,128]#[1, 20, 50] #[100, 200, 300, 400]
-
-parent= "/Users/palmamichele/Documents/Research Projects/moc/code/moc/data"
 
 total_files = 0
 smaller_eclipse = {"":0,"_train":0,"_test":0}
@@ -93,12 +254,6 @@ worst_ratio_eclipse=[-1]
 worst_ratio_eclipse_fast=[-1]
 
 
-r = 0.0005
-R = 2
-min_csize=1
-
-
-
 for l in lyrs:
     for n in neurons:
         savename = os.path.join(parent, f"mnist-{n}-{l}")
@@ -107,8 +262,13 @@ for l in lyrs:
 
         total_files += 1
 
+        
         filename = os.path.join(savename, "X.csv")
+
+          
         X = np.loadtxt(filename, delimiter=",")
+        print(X.shape)
+
         X = X.transpose()
 
         filename = os.path.join(savename, "X_train.csv")
@@ -175,42 +335,55 @@ for l in lyrs:
                 ydataset=F_test
 
             delta_step=1
+            r = delta_step
+
+            print("start exact moc")
+            start_time = time.time()  # start timer for fair comparison
             dmoc.init(xdataset,ydataset[0], 0, "EUCLIDEAN", "EUCLIDEAN", "NO")
             dmoc.computeMocPlot(xdataset, ydataset[0], delta_step)
             m1 = dmoc.getOmegaT()
-            
-            TX = len(m1)
+            elapsed = time.time() - start_time  # compute elapsed time
+            print("took (sec) ", elapsed)
+            TX = dmoc.getTX()
             #reconstruct values of t_values, having the size of mocplot
-            t_values = np.zeros(TX,dtype=np.float64)
-            for i in range(1, TX):
-                t_values[i]=t_values[i-1]+delta_step
+            t_values = dmoc.getTGrid()
 
 
-
+            print("start epsilon lsh moc")
+            start_time = time.time()  # start timer for fair 
             edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
-            edmoc.init(xdataset,ydataset[0],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN")
-            e1=[]
+            edmoc.init(X,F[0],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN", False, use_lsh)
+            e1_lsh =[]
             for t in t_values:
-                e1.append(edmoc.omega(t,xdataset,ydataset[0]))
+                e1_lsh.append(edmoc.omega(t,X,F[0]))
+
+            elapsedEPSLSH = time.time() - start_time  # compute 
+            print("took (sec) ", elapsed)
+
+            # print("start epsilon moc")
+            # start_time = time.time()  # start timer for fair 
+            # edmoc = FMCA.EpsilonDiscreteModulusOfContinuity()
+            # edmoc.init(xdataset,ydataset[0],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN")
+            # e1=[]
+            # e1 = [edmoc.omega(t,xdataset,ydataset[0]) for t in t_values]
+
+            # elapsedEps = time.time() - start_time  # compute 
+            # print("took (sec) ", elapsedEps)
+            
+           
 
 
+            print("start exact lsh moc")
             start_time = time.time()  # start timer for fair comparison
-            dmoc.init(xdataset,ydataset[1], len(m1), "EUCLIDEAN", "EUCLIDEAN", "NO")
-            dmoc.computeMocPlot(xdataset, ydataset[1], delta_step)
-            m2 = dmoc.getOmegaT()
-            elapsed = time.time() - start_time  # compute elapsed time
-            print("exact moc required "+str(elapsed)+" on "+str(type))
+            dmoc.init(xdataset,ydataset[0], 0, "EUCLIDEAN", "EUCLIDEAN", "NO", True)
 
-            start_time = time.time()  # start timer for fair comparison
-            edmoc.init(xdataset,ydataset[1],r,R,TX,min_csize,"EUCLIDEAN", "EUCLIDEAN")
-            e2=[]
-            for t in t_values:
-                e2.append(edmoc.omega(t,xdataset,ydataset[1]))
-            elapsed = time.time() - start_time  # compute elapsed time
-            print("epsilon moc required "+str(elapsed)+" on "+str(type))
+            m1_lsh = [dmoc.getOmega(xdataset, ydataset[0], t) for t in t_values]
+
+            elapsedLSH= time.time() - start_time  # compute elapsed time
+            print("took (sec) ", elapsedLSH)
 
 
-            plot_mocs([m1,m2], [e1, e2], t_values,  os.path.join(savename, f"{type}NEWmoc.png"))
+            plot_mocs(m1, [], m1_lsh, e1_lsh, t_values,  os.path.join(savename, f"{type, how_many}latest_MOC.png"))
 
             L = lipschitz_from_fmoc(m1, t_values)
 
@@ -220,207 +393,41 @@ for l in lyrs:
 
             print(L, "from epsilon")
 
-            with open(file_path, mode="a", newline="") as f:
+            L = lipschitz_from_fmoc(m1_lsh, t_values)
+
+            print(L, "from exact lsh")
+
+            L = lipschitz_from_fmoc(e1_lsh, t_values)
+
+            print(L, "from epsilon lsh")
+
+            summary_csv = os.path.join(savename, str(how_many)+"summary_F0.csv")
+            with open(summary_csv, mode="w", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow([f"lipschitz from moc {type} for F0", L, elapsed])
-            
-            exit()
-# exit()   
-# summary_csv = os.path.join(parent, "mnist_summary_F0.csv")
-# with open(summary_csv, mode="w", newline="") as f:
-#     writer = csv.writer(f)
+                writer.writerow([
+                    "L from exact moc",
+                    #"L from epsilon moc",
+                    "L from exact lsh moc",
+                    "L from epsilon lsh moc",
+                    "time (secs) for exact moc",
+                    #"time from epsilon moc",
+                    "time from exact lsh moc",
+                    "time from epsilon lsh moc"
+                ])
 
-#     writer.writerow([
-#         "total_files (including none comparisons)",
-
-#         "L_smaller_than_ECLipsE",
-#         "L_smaller_than_ECLipsE_Fast",
-#         "L_greater_than_ECLipsE",
-#         "L_greater_than_ECLipsE_Fast",
-
-#         "L_smaller_than_ECLipsE on train only ",
-#         "L_smaller_than_ECLipsE_Fast on train only",
-#         "L_greater_than_ECLipsE on train only",
-#         "L_greater_than_ECLipsE_Fast on train only",
-
-
-#         "L_smaller_than_ECLipsE on test only ",
-#         "L_smaller_than_ECLipsE_Fast on test only",
-#         "L_greater_than_ECLipsE on test only",
-#         "L_greater_than_ECLipsE_Fast on test only",
-
-#         "files_where_L_greater_than_ECLipsE",
-#         "files_where_L_greater_than_ECLipsE_Fast",
-
-#         "worst ratio L trivial",
-#         "worst ratio L eclipse",
-#         "worst ratio L eclipse_fast"
-#     ])
-
-#     writer.writerow([
-#         total_files,
-#         smaller_eclipse[""],
-#         smaller_eclipse_fast[""],
-#         greater_eclipse[""],
-#         greater_eclipse_fast[""],
-        
-#         smaller_eclipse["_train"],
-#         smaller_eclipse_fast["_train"],
-#         greater_eclipse["_train"],
-#         greater_eclipse_fast["_train"],
-
-#         smaller_eclipse["_test"],
-#         smaller_eclipse_fast["_test"],
-#         greater_eclipse["_test"],
-#         greater_eclipse_fast["_test"],
-
-#         ";".join(greater_eclipse_files),
-#         ";".join(greater_eclipse_fast_files),
-
-#         np.max(worst_ratio_trivial),
-#         np.max(worst_ratio_eclipse),
-#         np.max(worst_ratio_eclipse_fast)
-#     ])
-
-# print("end mnist")
+                writer.writerow([
+                lipschitz_from_fmoc(m1, t_values),
+                    #lipschitz_from_fmoc(e1, t_values),
+                    lipschitz_from_fmoc(m1_lsh, t_values),
+                    lipschitz_from_fmoc(e1_lsh, t_values),
+                    elapsed,
+                    elapsedEPSLSH,
+                    elapsedLSH
+                ])
 
 
-# lyrs = [2, 5, 10, 20, 30, 50, 75, 100]
-# neurons = [20, 40, 60, 80, 100]
+print("end mnist")
 
-# total_files=0
-# count_smaller_than_eclipse=0
-# count_smaller_than_eclipse_fast=0
-# count_greater_than_eclipse=0
-# count_greater_than_eclipse_fast=0
-# greater_eclipse_files = []
-# greater_eclipse_fast_files = []
-
-# worst_ratio_trivial=[-1]
-# worst_ratio_eclipse=[-1]
-# worst_ratio_eclipse_fast=[-1]
-
-
-# how_many=70000
-# delta_step=0.05
-
-
-# for l in lyrs:
-#     for n in neurons:
-#         savename = os.path.join(parent, f"simplenet-{n}-{l}")
-
-#         if not(os.path.isdir(savename)):
-#             continue
-#         total_files += 1
-
-#         filename = os.path.join(savename, "X.csv")
-#         X = np.loadtxt(filename, delimiter=",")
-        
-#         print(X.shape)
-
-#         X = X[:how_many,:]
-
-#         X = X.transpose()
-
-#         F = [[],[]]
-#         filename = os.path.join(savename, "F_0.csv")
-#         F[0]= np.loadtxt(filename, delimiter=",")
-#         F[0] = F[0][:how_many]
-#         F[0] = F[0].reshape(-1, 1)
-#         F[0] = F[0].transpose()
-
-#         print("X shape:", X.shape)
-#         print("F0 shape:", F[0].shape)
-
-
-#         filename = os.path.join(savename, "F_1.csv")
-#         F[1]= np.loadtxt(filename, delimiter=",")
-#         F[1] = F[1][:how_many]
-
-#         F[1] = F[1].reshape(-1, 1)
-#         F[1] = F[1].transpose()
-#         start_time = time.time()  # start timer
-        
-
-#         edmoc = exactdmoc.ExactDiscreteModulusOfContinuity()
-#         edmoc.init(X,F[0])
-
-        
-#         print("hey")
-#         elapsed = time.time() - start_time  # compute elapsed time
-#         m1 = edmoc.computeMocPlot(X, F[0], delta_step)
-       
-        
-#         m2 = edmoc.computeMocPlot(X, F[1], delta_step)
-#         print("required "+str(elapsed))
-
-#         #reconstruct values of t_values, having the size of mocplot
-#         t_values = np.zeros(len(m1),dtype=np.float64)
-
-#         for i in range(1, len(t_values)):
-#             t_values[i]=t_values[i-1]+delta_step
-
-#         plot_mocs([m1,m2], [], t_values,  os.path.join(savename, f"{delta_step, how_many}NEWmoc.png"))
-
-#         #load it back via:  np.load('array.npy')
-#         save_name = os.path.join(savename, f"old_moc") 
-#         gt_m = np.load(save_name+'.npy')
-#         gt_t = np.load(save_name+'t.npy')
-#         if (not(np.array_equal(gt_m, m1) and np.array_equal(gt_t, t_values))):
-#             print("problem!!!" + save_name)
-
-
-#             print("exact one", m1)
-#             print("\n old one:", gt_m)
-
-#             print("deltas one", t_values)
-#             print("\n old deltas:", gt_t)
-#         else:
-#             print("ok")
-        
-#         L = lipschitz_from_fmoc(m1, t_values)
-#         print(L)
-
-#         exit()
-        
-#         #plot_mocs(fmocs, lshmocs, deltas, os.path.join(savename, f"moc.png"))
-        
-#         file_path = os.path.join(savename, "lip_constants_with_time.csv")
-#         if os.path.exists(file_path):
-#             eclipse, eclipse_fast,trivial = read_eclipse_constants(file_path)
-#         else:
-#             eclipse = eclipse_fast =trivial = None  # skip counting
-
-
-#         
-
-#         print(L)
-
-#         if eclipse is not None:
-
-#             worst_ratio_eclipse.append(L/eclipse)
-
-#             if L <= eclipse:
-#                 count_smaller_than_eclipse += 1
-#             else:
-#                 count_greater_than_eclipse +=1
-#                 greater_eclipse_files.append(savename)
-#         if eclipse_fast is not None:
-
-#             worst_ratio_eclipse_fast.append(L/eclipse_fast)
-#             if L<= eclipse_fast:
-#                 count_smaller_than_eclipse_fast += 1
-#             else:
-#                 count_greater_than_eclipse_fast +=1
-#                 greater_eclipse_fast_files.append(savename)
-
-#         if trivial is not None:
-#             worst_ratio_eclipse.append(L/trivial)
-
-
-#         with open(file_path, mode="a", newline="") as f:
-#             writer = csv.writer(f)
-#             writer.writerow([f"lipschitz from moc for F0", L, elapsed])
 
 # summary_csv = os.path.join(parent, "simplenet_summary_F0.csv")
 # with open(summary_csv, mode="w", newline="") as f:
@@ -457,6 +464,3 @@ for l in lyrs:
 #     ])
 
 
-
-# print(total_files)
-# print("end random")

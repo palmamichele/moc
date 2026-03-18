@@ -38,13 +38,10 @@ f1 = np.array([1,3,2,5,4,6], dtype=np.float64).reshape(1, -1)
 f2 = np.array([3,2,3,3,4,3], dtype=np.float64).reshape(1, -1)#must have shape (d,n), so use this on 1D array
 x =  np.array([1,2,3,4,5,6], dtype=np.float64).reshape(1, -1)
 
-
 delta_step = 1
 edmoc = exactdmoc.ExactDiscreteModulusOfContinuity()
 edmoc.init(x,f1)
-
 m1 = edmoc.computeMocPlot(x, f1, delta_step)
-
 edmoc.init(x,f2)
 m2 = edmoc.computeMocPlot(x, f2, delta_step)
 

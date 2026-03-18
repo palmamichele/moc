@@ -7,7 +7,7 @@ include/
 pybind11/
 build/
 data/
-fmca/
+
 
 .DS_Store
 
