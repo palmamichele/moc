@@ -5,8 +5,43 @@
 3. [License](#license)
 
 ## Installation
-To get started install the required dependencies.
+Clone the repository
+```bash
+git clone https://github.com/palmamichele/moc
+cd moc
+```  
 
+Suggested: create a virtual environment.
+
+Install ECLipsE 
+```bash
+git clone https://github.com/YuezhuXu/ECLipsE.git
+cd ECLipsE
+pip install -e .
+cd ..
+```
+
+(for one layers  if l == 1:
+        W = weights[0]
+        # exact for a single linear layer
+        return torch.linalg.matrix_norm(W, ord=2), exit_code)
+
+
+Install FMCA and set the DD branch
+```bash
+git clone https://github.com/muchip/fmca.git
+cd fmca
+git checkout DD 
+```
+
+Ensure OpenMP is available in your compiler configured in CMAKE (e.g. g++)
+```bash
+export CC=/opt/homebrew/bin/gcc-15  
+export CXX=/opt/homebrew/bin/g++-15
+```
+
+
+Install the required dependencies.
 Install pybind11 (sugg. via homebrew )
 
 ```bash
@@ -20,21 +55,7 @@ brew install eigen
 ```
 
 
-Ensure OpenMP is available in your compiler configured in CMAKE (e.g. g++)
-```bash
-export CC=/opt/homebrew/bin/gcc-15  
-export CXX=/opt/homebrew/bin/g++-15
-```
-
-Clone FMCA and set the DD branch (3487dad)
-```bash
-git clone https://github.com/muchip/fmca.git
-cd fmca
-git checkout DD 
-cd ..
-```
-
-Compile FMCA following FMCA README.md  (later we use our cmake file)
+Compile FMCA (following FMCA README.md)  (later we might use our cmake file)
 ```bash
 mkdir build
 cd build
@@ -44,22 +65,7 @@ cd ..
 ```  
 
 
-```bash
-git clone https://github.com/palmamichele/moc
-cd moc
-mv ../fmca .    
-```  
-
-
-
-##Build in moc project folder
-```bash
-mkdir build
-cd build
-cmake ..
-make     
-```  
-
 ## Usage
-for python see 
-moc/moc_ECLIPSE.py file
+download your ImageNet dataset from https://www.kaggle.com/competitions/imagenet-object-localization-challenge/data (suggested kagglehub)
+
+Convert the val folder to the same format as the train folder (i.e., move the images to their respective folders). (credits: https://github.com/fh295/semanticCNN, https://raw.githubusercontent.com/soumith/imagenetloader.torch/master/valprep.sh)

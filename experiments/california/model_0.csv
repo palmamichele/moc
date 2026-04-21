@@ -1,0 +1,6 @@
+constant type,value,seconds required
+trivial,226.3154709991837,0.00023484230041503906
+ECLipsE,"tensor(1.6309, dtype=torch.float64)",15.23939037322998
+ECLipsE_Fast,"tensor(1.6309, dtype=torch.float64)",0.007826089859008789
+R^2 on train,0.6708354949951172,0
+R^2 on test,0.6630375385284424,0
