@@ -58,13 +58,12 @@ export_test_loader = DataLoader(
     shuffle=False
 )
 
-n_epochs=100
+n_epochs=500
 out_dir = Path("experiments") / "california"
 out_dir.mkdir(parents=True, exist_ok=True)
 
-
 lyrs = [3, 20, 100] #[2, 5, 10, 20, 30, 50, 75, 100]
-neurons = [100, 300, 400] #[20, 40, 60, 80, 100]
+neurons = [50, 100, 200] #[20, 40, 60, 80, 100]
 j=0
 for l in lyrs:
     for n in neurons:
@@ -73,8 +72,9 @@ for l in lyrs:
             un_model = copy.deepcopy(model)
             criterion = nn.MSELoss()
             optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+            
+            
             model.train()
-
             for epoch in range(n_epochs):
                 optimizer.zero_grad()
                 pred = model(X_train_tensor)
@@ -88,18 +88,23 @@ for l in lyrs:
             un_model.eval()
             with torch.no_grad():
                 pred_train = model(X_train_tensor)
-                pred_test = model(X_test_tensor)
+                    
 
             train_mse = criterion(pred_train, y_train_tensor).item()
-            test_mse = criterion(pred_test, y_test_tensor).item()
+            
             print(f"train MSE = {train_mse} of {j}")
-            print(f"test MSE = {test_mse} of {j}")
 
             train_r2 = r2_score(
             y_train_tensor.cpu().numpy().ravel(),
             pred_train.cpu().numpy().ravel()
             )
 
+            model.eval()
+            with torch.no_grad():
+                    pred_train = model(X_train_tensor)
+                    pred_test = model(X_test_tensor)
+
+            test_mse = criterion(pred_test, y_test_tensor).item()
             test_r2 = r2_score(
                 y_test_tensor.cpu().numpy().ravel(),
                 pred_test.cpu().numpy().ravel()

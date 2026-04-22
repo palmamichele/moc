@@ -8,6 +8,7 @@ pybind11/
 build/
 data/
 
+__pycache__/
 
 .DS_Store
 

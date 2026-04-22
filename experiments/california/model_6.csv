@@ -1,6 +1,9 @@
 constant type,value,seconds required
-trivial,7.890491405920338e+75,0.0015020370483398438
-ECLipsE,"tensor(1.5594e-06, dtype=torch.float64)",9.001874923706055
-ECLipsE_Fast,"tensor(1.5594e-06, dtype=torch.float64)",0.18700218200683594
-R^2 on train,-1.1920928955078125e-07,0
-R^2 on test,-0.00028908252716064453,0
+trivial,7.060779411628059e+60,0.0011289119720458984
+ECLipsE,"tensor(5.3859e-07, dtype=torch.float64)",0.7480878829956055
+ECLipsE_Fast,"tensor(5.3859e-07, dtype=torch.float64)",0.0361180305480957
+R^2 on train,0.0,0
+R^2 on test,-0.0002976655960083008,0
+dmoc_union,0.0,5.450218200683594
+dmoc_train,0.0,3.680156707763672
+dmoc_test,0.0,0.22858905792236328

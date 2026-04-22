@@ -28,7 +28,7 @@ out_dir = Path("experiments") / "MNIST"
 out_dir.mkdir(parents=True, exist_ok=True)
 
 lyrs = [3, 20, 100] #[2, 5, 10, 20, 30, 50, 75, 100]
-neurons = [100, 300, 400] #[20, 40, 60, 80, 100]
+neurons = [50, 100, 200] #[20, 40, 60, 80, 100]
 num_classes = 10
 n_experiments=1
 
