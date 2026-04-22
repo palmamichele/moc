@@ -1,12 +1,12 @@
 %enter the desired model-experiment directory 
 
 % Load the CSV files
-type= "union";
+type= "train";
 data_moc = readmatrix(sprintf('%s_data_dmoc.csv', type));
 %deltas = readmatrix('train_deltas_dmoc_0.csv');
 %plot(deltas, data_moc, '-o', 'DisplayName', 'train data');
 
-nModels=6; %100
+nModels=1; %100
 
 for k=0:nModels-1
     deltas_all{k+1} = readmatrix(sprintf('%s_deltas_dmoc_%d.csv', type, k));

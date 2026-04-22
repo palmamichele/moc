@@ -14,7 +14,7 @@ np.random.seed(0)
 delta_step=0.0125
 save_path = Path("experiments")
 
-for mdl in ["iris"]: #["linear-california", "california"]
+for mdl in ["MNIST"]: #["linear-california", "california", "iris"]
     folder_path = save_path / str(mdl) 
     folder_path.mkdir(parents=True, exist_ok=True)
 
