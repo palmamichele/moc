@@ -28,7 +28,7 @@ out_dir = Path("experiments") / "MNIST"
 out_dir.mkdir(parents=True, exist_ok=True)
 
 lyrs = [3, 20, 100] #[2, 5, 10, 20, 30, 50, 75, 100]
-neurons = [50, 100, 200] #[20, 40, 60, 80, 100]
+neurons = [50, 100, 200]#[20, 40, 60, 80, 100]
 num_classes = 10
 n_experiments=1
 
@@ -185,6 +185,8 @@ for l in lyrs:
                 writer.writerow(["trivial", lip_trivial, lip_trivial_t])
                 writer.writerow(["ECLipsE", lip_eclipse, lip_eclipse_t])
                 writer.writerow(["ECLipsE_Fast", lip_eclipse_fast, lip_eclipse_fast_t])
+                writer.writerow(["accuracy on train", train_acc, 0])
+                writer.writerow(["accuracy on test", test_acc, 0])
             j=j+1
 
 

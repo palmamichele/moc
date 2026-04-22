@@ -1,0 +1,9 @@
+constant type,value,seconds required
+trivial,1.5912803898454102e+91,0.010415077209472656
+ECLipsE,"tensor(4.2973e-06, dtype=torch.float64)",23.562673091888428
+ECLipsE_Fast,"tensor(4.2973e-06, dtype=torch.float64)",0.7739620208740234
+accuracy on train,0.3333333432674408,0
+accuracy on test,0.3333333432674408,0
+dmoc_union,0.0,0.0004818439483642578
+dmoc_train,0.0,0.0003578662872314453
+dmoc_test,0.0,0.0001068115234375
