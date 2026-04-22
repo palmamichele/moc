@@ -113,7 +113,7 @@ for l in lyrs:
             print(f"train R^2 = {train_r2:.6f} of {j}")
             print(f"test R^2 = {test_r2:.6f} of {j}")
 
-
+            
             export_split_to_csv(export_train_loader, "train", model, un_model, save_path, j)
             export_split_to_csv(export_test_loader, "test", model, un_model, save_path, j)
 

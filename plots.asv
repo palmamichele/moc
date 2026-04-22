@@ -31,9 +31,9 @@ for k = 1:nModels
     end
 
     % Log plots require positive values
-    % if any(x <= 0) || any(y1 <= 0) || any(y2 <= 0) || any(y3 <= 0)
-    %     error('Model %d: log plots require all x and y values to be positive.', k);
-    % end
+    if any(x <= 0) || any(y1 <= 0) || any(y2 <= 0) || any(y3 <= 0)
+        error('Model %d: log plots require all x and y values to be positive.', k);
+    end
 
     nexttile;
     loglog(x+eps, y1+eps, '-o', 'DisplayName', strcat(type, ' data')); hold on;

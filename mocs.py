@@ -14,7 +14,7 @@ np.random.seed(0)
 delta_step=0.0125
 save_path = Path("experiments")
 
-for mdl in ["MNIST"]: #["linear-california", "california", "iris"]
+for mdl in ["linear-california", "california", "iris", "MNIST"]:
     folder_path = save_path / str(mdl) 
     folder_path.mkdir(parents=True, exist_ok=True)
 
@@ -27,6 +27,8 @@ for mdl in ["MNIST"]: #["linear-california", "california", "iris"]
     print(n_experiments)
 
     max_distance = None  #will compute bounding box trick 
+    norm = "EUCLIDEAN"
+
     # delta_values = []
     # header = ["bound Lipschitz","dmoc Lipschitz", "lsh Lipschitz","n_points in the dataset","exact Lipschitz Time", "full dmoc Time", "full lsh moc Time"]
     # rows = []
@@ -36,64 +38,101 @@ for mdl in ["MNIST"]: #["linear-california", "california", "iris"]
     filename = Path("data")/str(mdl)
     for i in range(n_experiments):
 
-        for type in ["union", "train", "test"]:
+        #always try to load train, test, to make the union 
+        X_train = np.loadtxt(filename/("X_train.csv"), delimiter=",",ndmin=2)
+        X_test = np.loadtxt(filename/("X_test.csv"), delimiter=",",ndmin=2)
+        Y_train = np.loadtxt(filename/("Y_train.csv"), delimiter="," , ndmin=2)
+        Y_test = np.loadtxt(filename/("Y_test.csv"), delimiter="," , ndmin=2)
+        F_train = np.loadtxt(filename/(f"F_train_{i}.csv"), delimiter="," , ndmin=2)
+        F_test = np.loadtxt(filename/(f"F_test_{i}.csv"), delimiter="," , ndmin=2)
+        F_untrain = np.loadtxt(filename/(f"F_un_train_{i}.csv"), delimiter="," , ndmin=2)
+        F_untest = np.loadtxt(filename/(f"F_un_test_{i}.csv"), delimiter="," , ndmin=2)
+        
+        X_union = np.vstack([X_train, X_test])
+        Y_union = np.vstack([Y_train, Y_test])
+        F_union = np.vstack([F_train, F_test])
+        F_un_union = np.vstack([F_untrain, F_untest])
 
-            if type=="union":
-                X_train = np.loadtxt(filename/("X_train.csv"), delimiter=",",ndmin=2)
-                X_test = np.loadtxt(filename/("X_test.csv"), delimiter=",",ndmin=2)
-                Y_train = np.loadtxt(filename/("Y_train.csv"), delimiter="," , ndmin=2)
-                Y_test = np.loadtxt(filename/("Y_test.csv"), delimiter="," , ndmin=2)
-                F_train = np.loadtxt(filename/(f"F_train_{i}.csv"), delimiter="," , ndmin=2)
-                F_test = np.loadtxt(filename/(f"F_test_{i}.csv"), delimiter="," , ndmin=2)
-                F_untrain = np.loadtxt(filename/(f"F_un_train_{i}.csv"), delimiter="," , ndmin=2)
-                F_untest = np.loadtxt(filename/(f"F_un_test_{i}.csv"), delimiter="," , ndmin=2)
-                
-                X = np.vstack([X_train, X_test])
-                Y = np.vstack([Y_train, Y_test])
-                F = np.vstack([F_train, F_test])
-                F_un = np.vstack([F_untrain, F_untest])
-            else:
-                X = np.loadtxt(filename/("X_"+type+".csv"), delimiter=",",ndmin=2)
-                Y = np.loadtxt(filename/("Y_"+type+".csv"), delimiter="," , ndmin=2)
-                F = np.loadtxt(filename/("F_"+type+f"_{i}.csv"), delimiter="," , ndmin=2)
-                F_un = np.loadtxt(filename/("F_un_"+type+f"_{i}.csv"), delimiter="," , ndmin=2)
+        X_union = X_union.transpose()
+        Y_union = Y_union.transpose()
+        n = len(F_union)
+        print("-> n points:"+str(n))
+        F_union = F_union.transpose()
+        F_un_union= F_un_union.transpose()
 
+        #start by computing dmoc on union (this will contain largest tgrid)
+        dmoc = FMCA.DiscreteModulusOfContinuity()
+        start_time = time.time()  
+        dmoc.init(X_union,Y_union, max_distance, delta_step, norm, norm)
+        data_m = dmoc.omegat()
+        data_t = time.time() - start_time 
+        t_values = dmoc.tgrid()
+
+        #compute dmoc of trained net
+        dmoc = FMCA.DiscreteModulusOfContinuity()
+        start_time = time.time()  
+        dmoc.init(X_union,F_union, max_distance, delta_step,norm, norm)
+        tr_m = dmoc.omegat()
+        tr_t = time.time() - start_time 
+        
+
+        #compute dmoc of untrained net
+        dmoc = FMCA.DiscreteModulusOfContinuity()
+        start_time = time.time() 
+        dmoc.init(X_union,F_un_union, max_distance, delta_step,norm, norm)
+        un_m = dmoc.omegat()
+
+
+        save_moc(un_m,folder_path, f"union_untrained_dmoc_{i}")
+        save_moc(tr_m,folder_path, f"union_trained_dmoc_{i}")
+        save_moc(data_m,folder_path, f"union_data_dmoc")
+        save_moc(t_values,folder_path, f"deltas_dmoc_{i}")
+
+        start_time = time.time()
+        lip_moc = lipschitz_from_fmoc(tr_m, t_values)
+        lip_moc_t = time.time()-start_time
+
+        csv_path = folder_path / f"model_{i}.csv"
+        with open(csv_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["dmoc_union", lip_moc, tr_t+lip_moc_t ])
+            #writer.writerow(["lshmoc", lip_eclipse, lip_eclipse_t])
+
+
+        max_distance = t_values[-1]
+
+        for type in ["train", "test"]:
+            X = np.loadtxt(filename/("X_"+type+".csv"), delimiter=",",ndmin=2)
+            Y = np.loadtxt(filename/("Y_"+type+".csv"), delimiter="," , ndmin=2)
+            F = np.loadtxt(filename/("F_"+type+f"_{i}.csv"), delimiter="," , ndmin=2)
+            F_un = np.loadtxt(filename/("F_un_"+type+f"_{i}.csv"), delimiter="," , ndmin=2)
 
             X = X.transpose()
-            Y = Y.transpose()
-            n = len(F)
-            print("-> n points:"+str(n))
+            Y=Y.transpose()
             F = F.transpose()
-            F_un= F_un.transpose()
-            d = len(F)
-            print("-> dim points:"+str(d))
+            F_un = F_un.transpose()
 
-
-            #open the csv file for the mdl-experiment, store (append) constant estimation and time required for computing moc plots
-
-            #compute dmoc of data
+            #start by computing dmoc on union (this will contain largest tgrid)
             dmoc = FMCA.DiscreteModulusOfContinuity()
             start_time = time.time()  
-            dmoc.init(X,Y, max_distance, delta_step,"EUCLIDEAN", "EUCLIDEAN")
+            dmoc.init(X,Y, max_distance, delta_step, norm, norm)
             data_m = dmoc.omegat()
             data_t = time.time() - start_time 
-            t_values = dmoc.tgrid()
 
             #compute dmoc of trained net
             dmoc = FMCA.DiscreteModulusOfContinuity()
             start_time = time.time()  
-            dmoc.init(X,F, max_distance, delta_step,"EUCLIDEAN", "EUCLIDEAN")
+            dmoc.init(X,F, max_distance, delta_step,norm, norm)
             tr_m = dmoc.omegat()
             tr_t = time.time() - start_time 
-            t_values = dmoc.tgrid() if len(dmoc.tgrid()) > len(t_values) else t_values
+            
 
             #compute dmoc of untrained net
             dmoc = FMCA.DiscreteModulusOfContinuity()
             start_time = time.time() 
-            dmoc.init(X,F_un, max_distance, delta_step,"EUCLIDEAN", "EUCLIDEAN")
+            dmoc.init(X,F_un, max_distance, delta_step,norm, norm)
             un_m = dmoc.omegat()
-            t_values = dmoc.tgrid() if len(dmoc.tgrid()) > len(t_values) else t_values
-            
+
             #un_m= pad_moc_with_last(un_m, len(t_values))
 
             
