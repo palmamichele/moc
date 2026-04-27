@@ -54,7 +54,7 @@ val_loader = DataLoader(
 device = torch.device("cpu")
 un_model.eval()
 tr_model.eval()
-output_path = Path("data") / "alexnet"
+output_path = Path("data") / "imagenet"
 
 def export_split_to_csv(loader, split_name):
     x_file = output_path / f"X_{split_name}.csv"

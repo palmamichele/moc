@@ -1,7 +1,7 @@
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import fetch_california_housing
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import TensorDataset, DataLoader, Subset
 from eclipse_nn.LipConstEstimator import LipConstEstimator
 from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import load_iris
@@ -62,7 +62,7 @@ n_epochs=500
 out_dir = Path("experiments") / "california"
 out_dir.mkdir(parents=True, exist_ok=True)
 
-lyrs = [3, 20, 100] #[2, 5, 10, 20, 30, 50, 75, 100]
+lyrs = [3, 20, 5]  #[2, 5, 10, 20, 30, 50, 75, 100]
 neurons = [50, 100, 200] #[20, 40, 60, 80, 100]
 j=0
 for l in lyrs:
@@ -73,7 +73,13 @@ for l in lyrs:
             criterion = nn.MSELoss()
             optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
             
-            
+            if l==lyrs[-1]: #e.g. last size, overfitting case
+               X_train_tensor=X_train_tensor[:5]
+               y_train_tensor=y_train_tensor[:5]
+               n_epochs=100 #can be changed
+
+
+        
             model.train()
             for epoch in range(n_epochs):
                 optimizer.zero_grad()
