@@ -1,6 +1,6 @@
 % enter the desired model-experiment directory 
 modelname = "linear california";
-nModels = 12; % 100
+Models = [10, 100, 1000, 10000]; % 100
 out_path = sprintf('%s/plots',pwd);
 
 
@@ -8,18 +8,25 @@ for type = ["union"] %["union", "train", "test"]
         
     for norm = ["E", "T"]
 
-        data_moc = readmatrix(sprintf('%s_data_dmoc_%s.csv', type, norm));
-        for k = 0:nModels-1
-            deltas_all{k+1} = readmatrix(sprintf('deltas_dmoc_%d_%s.csv', k, norm));
-            data_all{k+1}   = data_moc;
-            tr_all{k+1}     = readmatrix(sprintf('%s_trained_dmoc_%d_%s.csv', type, k, norm));
-            un_all{k+1}     = readmatrix(sprintf('%s_untrained_dmoc_%d_%s.csv', type, k, norm));
+
+        for k = Models
+            x = readmatrix(sprintf('deltas_dmoc_%d_%s.csv', k, norm));
+            data_moc = readmatrix(sprintf('%s_data_dmoc_%d_%s.csv', type, k,norm));
+            y  = data_moc;
+
+            if log_plots
+                        loglog(x, y, '-o', 'DisplayName', strcat(type, ' data')); hold on;
+                
+            else 
+                        plot(x, y, '-o', 'DisplayName', strcat(type, ' data')); hold on;
+                
+            end
+
+                    
         end
+
         
-        nCols = ceil(sqrt(nModels));
-        nRows = ceil(nModels / nCols);
-
-
+       
         for plot_Lip =[true] %[false true]
         
             for log_plots = [true]%[false true]
@@ -50,17 +57,7 @@ for type = ["union"] %["union", "train", "test"]
                 
                     nexttile;
                 
-                    if log_plots
-                        loglog(x, y1, '-o', 'DisplayName', strcat(type, ' data')); hold on;
-                        loglog(x, y2, '-s', 'DisplayName', 'trained model');
-                        loglog(x, y3, '-^', 'DisplayName', 'untrained model');
-                
-                    else 
-                        plot(x, y1, '-o', 'DisplayName', strcat(type, ' data')); hold on;
-                        plot(x, y2, '-s', 'DisplayName', 'trained model');
-                        plot(x, y3, '-^', 'DisplayName', 'untrained model');
-                
-                    end
+                    
                 
                     if plot_Lip
                         L_tr = max(y2(x > 0) ./ x(x > 0));
@@ -79,11 +76,7 @@ for type = ["union"] %["union", "train", "test"]
                     end
                     hold off;
                 
-                    xlabel('t');
-                    ylabel('dmoc(t)');
-                    title(sprintf('%s %d', modelname,k-1));
-                    legend;
-                    grid on;
+                   
                     
                     if log_plots
                         loglb = "logmocplots";
