@@ -1,6 +1,6 @@
 % enter the desired model-experiment directory 
-modelname = "linear california";
-nModels = 12; % 100
+modelname = "MNIST";
+nModels = 9; % 100
 out_path = sprintf('%s/plots',pwd);
 
 
@@ -82,7 +82,10 @@ for type = ["union"] %["union", "train", "test"]
                     xlabel('t');
                     ylabel('dmoc(t)');
                     title(sprintf('%s %d', modelname,k-1));
-                    legend;
+                    % lgd = legend;
+                    % lgd.Box = 'off';
+                    % lgd.Location = 'bestoutside';
+
                     grid on;
                     
                     if log_plots

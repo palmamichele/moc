@@ -1,0 +1,7 @@
+model_path,pairs,norm,arel_data,norm_arel_data,srel_data,r_data
+iris,data moc_union & data moc_train,E,0,0,1,1
+iris,data moc_union & data moc_test,E,0.390322943214977,0.338775009205858,0.676838258876508,0.515371753407362
+iris,data moc_train & data moc_test,E,0.390322943214977,0.338775009205858,0.676838258876508,0.515371753407362
+iris,data moc_union & data moc_train,T,0,0,1,0.999999999999934
+iris,data moc_union & data moc_test,T,0.5586,0.358720780888775,0.57200931658441,0.532504884662457
+iris,data moc_train & data moc_test,T,0.5586,0.358720780888775,0.57200931658441,0.532504884662457
