@@ -21,12 +21,6 @@ pip install -e .
 cd ..
 ```
 
-(for one layers  if l == 1:
-        W = weights[0]
-        # exact for a single linear layer
-        return torch.linalg.matrix_norm(W, ord=2), exit_code)
-
-
 Install FMCA and set the DD branch
 ```bash
 git clone https://github.com/muchip/fmca.git

@@ -6,7 +6,7 @@ from eclipse_nn.LipConstEstimator import LipConstEstimator
 from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import load_iris
 from sklearn.metrics import r2_score
-from utils import NeuralNet, export_split_to_csv
+from utils import NeuralNet, export_split_to_csv, LipConstEstimatorL1
 import numpy as np
 import torch.nn as nn
 import torch
@@ -140,13 +140,18 @@ for l in lyrs:
             lip_eclipse_fast = est.estimate(method="ECLipsE_Fast")
             lip_eclipse_fast_t = time.time()-start_time
 
+            start_time = time.time()
+            estimator_l1 = LipConstEstimatorL1(model=model)
+            l1_bound = estimator_l1.estimate_trivial_l1()
+            l1_bound_t = time.time()-start_time
 
                 
             csv_path = out_dir / f"model_{j}.csv"
             with open(csv_path, "w", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(["constant type", "value", "seconds required"])
-                writer.writerow(["trivial", lip_trivial, lip_trivial_t ])
+                writer.writerow(["constant type", "value", "seconds required"]) #trivial must be adj for softmaxhead
+                writer.writerow(["trivial_l2", lip_trivial, lip_trivial_t ])
+                writer.writerow(["trivial_l1", l1_bound, l1_bound_t ]) 
                 writer.writerow(["ECLipsE", lip_eclipse, lip_eclipse_t])
                 writer.writerow(["ECLipsE_Fast", lip_eclipse_fast, lip_eclipse_fast_t])
                 writer.writerow(["accuracy on train", train_acc, 0])

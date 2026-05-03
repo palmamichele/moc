@@ -6,6 +6,39 @@ import torch
 from torch import nn, optim
 from pathlib import Path
 
+class LipConstEstimatorL1():
+    def __init__(self, model):
+        """
+        Extract weights directly from PyTorch model (no extract_model_info needed).
+        Assumes sequential fully-connected layers: Linear -> optional activation.
+        """
+        self.weights = []
+        self.num_layers = 0
+        
+        # Traverse model modules to extract Linear weights
+        for module in model.modules():
+            if isinstance(module, torch.nn.Linear):
+                self.weights.append(module.weight.data)  
+                self.num_layers += 1
+        
+        if self.num_layers == 0:
+            raise ValueError("No Linear layers found in model.")
+        
+        print(f"Extracted {self.num_layers} linear layer weights.")
+
+    def estimate_trivial_l1(self):
+        """trivial bound:|W|_1 = max column sum of |W|"""
+        l1_norms = []
+        for w in self.weights:
+            col_sums = torch.sum(torch.abs(w), dim=0)  # Sum over input dim (rows)
+            l1_norm = torch.max(col_sums)
+            l1_norms.append(l1_norm)
+        
+        bound = torch.prod(torch.tensor(l1_norms)).item()
+        return bound
+
+
+
 
 def save_moc(moc, savepath, lbl):
     """

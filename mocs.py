@@ -5,7 +5,7 @@ import sys
 import re 
 import matplotlib.pyplot as plt
 from pathlib import Path
-from utils import lipschitz_from_fmoc, pad_moc_with_last, save_moc
+from utils import lipschitz_from_fmoc, save_moc
 sys.path.append(str(Path("fmca") / "build" / "py"))
 import FMCA
 
