@@ -1,0 +1,10 @@
+Metric/Dataset,California housing,Iris,MNIST
+"A_{\\mathrm{rel}}({\bs w}_{X^{\mathrm{u}},f},{\bs w}_{X^{\mathrm{tr}},f})",0.00781198900406469,0,0
+"S_{\\mathrm{rel}}({\bs w}_{X^{\mathrm{u}},f},{\bs w}_{X^{\mathrm{tr}},f})",0.992188010995935,1,1
+"r({\bs w}_{X^{\mathrm{u}},f},{\bs w}_{X^{\mathrm{tr}},f})",0.998502940932741,1,0.999999999999997
+"A_{\\mathrm{rel}}({\bs w}_{X^{\mathrm{u}},f},{\bs w}_{X^{\mathrm{te}},f})",0.0582209280140145,0.338775009205858,0.0978087360325082
+"S_{\\mathrm{rel}}({\bs w}_{X^{\mathrm{u}},f},{\bs w}_{X^{\mathrm{te}},f})",0.941779071985986,0.661224990794142,0.902191263967492
+"r({\bs w}_{X^{\mathrm{u}},f},{\bs w}_{X^{\mathrm{te}},f})",0.994851466405112,0.515371753407362,0.861076028557344
+"A_{\\mathrm{rel}}({\bs w}_{X^{\mathrm{tr}},f},{\bs w}_{X^{\mathrm{te}},f})",0.0572252142769373,0.338775009205858,0.0978087360325082
+"S_{\\mathrm{rel}}({\bs w}_{X^{\mathrm{tr}},f},{\bs w}_{X^{\mathrm{te}},f})",0.942774785723063,0.661224990794142,0.902191263967492
+"r({\bs w}_{X^{\mathrm{tr}},f},{\bs w}_{X^{\mathrm{te}},f})",0.993903863620542,0.515371753407362,0.861076028557344

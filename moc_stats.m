@@ -1,0 +1,90 @@
+save_path = pwd;
+out_path = pwd;
+
+models = ["linear-california"] %["linear-california", "california", "iris", "MNIST"];
+
+types = ["test", "train", "union"];
+eq_split = ["X^{\mathrm{te}}","X^{\mathrm{tr}}", "X^{\mathrm{u}}"];
+
+for norm = ["E", "T"]
+
+    M = {};  
+
+    for mtype = models
+
+        folder_path = fullfile(save_path, mtype);
+        files = dir(folder_path);
+
+       
+        n_experiments = 0;
+        for j = 1:length(files)
+            if ~files(j).isdir && ~isempty(regexp(files(j).name, '^model_.+', 'once'))
+                n_experiments = n_experiments + 1;
+            end
+        end
+
+      
+        for k = 0:n_experiments-1
+
+            model_lb = mtype + "_" + string(k);
+
+          
+            for q = 1:length(types)
+
+                type = types(q);
+
+                data_file = fullfile(folder_path, sprintf('%s_data_dmoc_%s.csv', type, norm));
+                tr_file   = fullfile(folder_path, sprintf('%s_trained_dmoc_%d_%s.csv', type, k, norm));
+                un_file   = fullfile(folder_path, sprintf('%s_untrained_dmoc_%d_%s.csv', type, k, norm));
+
+                moc_data = readmatrix(data_file);
+                moc_tr   = readmatrix(tr_file);
+                moc_un   = readmatrix(un_file);
+
+               
+                pairs = { moc_data, moc_tr, "{\bs w}_{"+eq_split(q)+",f},{\bs w}_{"+eq_split(q)+",f_{\theta'}}"; 
+                    moc_data, moc_un, "{\bs w}_{"+eq_split(q)+",f},{\bs w}_{"+eq_split(q)+",f_{\theta}}"; 
+                    moc_tr, moc_un, "{\bs w}_{"+eq_split(q)+",f_{\theta'}},{\bs w}_{"+eq_split(q)+",f_{\theta}}"; 
+                    };
+
+              
+                for p = 1:size(pairs,1)
+
+                    A = pairs{p,1};
+                    B = pairs{p,2};
+                    pair_label = pairs{p,3};
+
+                    Arel_val = Arel(A,B);
+                    Srel_val = 1 - Arel_val;
+                    r_val = corr(A(:), B(:));
+
+              
+                    label_A = "A_{\\mathrm{rel}}(" + pair_label + ")";
+                    label_S = "S_{\\mathrm{rel}}(" + pair_label + ")";
+                    label_r = "r(" + pair_label + ")";
+
+
+                    M(end+1,:) = [{model_lb},{label_A}, num2cell(Arel_val)];
+                    M(end+1,:) = [{model_lb},{label_S}, num2cell(Srel_val)];
+                    M(end+1,:) = [{model_lb},{label_r}, num2cell(r_val)];
+
+                end
+            end
+        end
+    end
+
+
+    T = cell2table(M);
+
+    out_csv = fullfile(out_path, sprintf("moc_stats_%s.csv", norm));
+
+    writetable(T, out_csv, 'WriteVariableNames', false);
+
+    disp("done norm = " + norm)
+end
+
+
+function A = Arel(moc_a, moc_b)
+    delta = moc_a - moc_b;
+    A = sum(abs(delta)) / sum(abs(moc_a));
+end
