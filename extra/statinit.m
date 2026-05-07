@@ -94,15 +94,7 @@ for norm = ["E"]
 
 
 
-        % %data_moc = readmatrix(sprintf('%s_data_dmoc_%s.csv', type, norm));
-        % for k= experiments %1:n_experiments
-        %     writematrix([tgrid(idx), omega_tr(k, idx)',], fullfile(outPlotDir, sprintf('%s_%d_%s_%s_%s.txt', modelname, k, type, norm)), 'Delimiter', 'space');
-        %     %writematrix([tgrid(idx), data_moc(idx),omega_tr(k, idx)', omega_un(k, idx)'], fullfile(outPlotDir, sprintf('%s_%d_%s_%s_%s.txt', modelname, k-1, type, norm)), 'Delimiter', 'space');
-        % end
-
-
-        %stat across all runs (be careful, same model initializations not
-        %experiments)
+      
         mean_tr = mean(omega_tr, 1);
         std_tr  = std(omega_tr, 0, 1);
 

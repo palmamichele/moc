@@ -248,7 +248,6 @@ for mtype = models
 
 end
 end
-%
 
 
 function A = Arel(moc_a, moc_b)
