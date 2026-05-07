@@ -1,10 +1,8 @@
-#inspired by ECLipsE MNIST code
 from pathlib import Path
 import torch
 import copy 
 import csv
 import time 
-import torchvision
 import torchvision.transforms as transforms
 import numpy as np 
 from torch import nn, optim
@@ -27,11 +25,11 @@ torch.backends.cudnn.benchmark = False
 out_dir = Path("experiments") / "MNIST"
 out_dir.mkdir(parents=True, exist_ok=True)
 
-lyrs = [3, 20, 5]  #[2, 5, 10, 20, 30, 50, 75, 100]
-neurons = [50, 100, 200] #[20, 40, 60, 80, 100]
+lyrs = [3, 20, 5] 
+neurons = [50, 100, 200]
 num_classes = 10
 n_experiments=1
-num_epochs = 10
+num_epochs = 10 #following ECLipsE mnist code
 
 data_path = Path("data")
 # Load the training and test sets
@@ -88,6 +86,9 @@ export_train_loader = DataLoader(
     shuffle=False
 )
 
+
+
+
 export_test_loader = DataLoader(
     TensorDataset(X_test_tensor, y_test_export_tensor),
     batch_size=1,
@@ -103,20 +104,20 @@ for l in lyrs:
             criterion = nn.CrossEntropyLoss()
             optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 
-            if l==lyrs[-1]: #e.g. last size, overfitting case
+            if l==lyrs[-1]: #overfitting case
                 small_train_dataset = Subset(train_loader.dataset, range(5))
                 train_loader = DataLoader(
                     small_train_dataset,
                     batch_size=train_loader.batch_size,
                     shuffle=False
                 )
-                num_epochs=100 #might be changed
+                num_epochs=100 
 
             model.train()
-            # Training Loop
+            
             for epoch in range(num_epochs):
                 for images, labels in train_loader:
-                    # Forward pass
+                  
                     optimizer.zero_grad()
                     logits = model(images)
                     loss = criterion(logits, labels)
@@ -125,7 +126,7 @@ for l in lyrs:
 
                 print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
 
-            # evaluation on original loaders
+           
             model.eval()
             with torch.no_grad():
                 train_correct = 0
@@ -176,13 +177,13 @@ for l in lyrs:
             lip_eclipse_fast=0
             lip_eclipse_fast_t=0
 
-            print("ok")
+            
             start_time = time.time()
             est = LipConstEstimator(model=model)
             lip_eclipse = est.estimate(method="ECLipsE")
             lip_eclipse_t = time.time() - start_time
 
-            print("okk")
+           
             start_time = time.time()
             est = LipConstEstimator(model=model)
             lip_eclipse_fast = est.estimate(method="ECLipsE_Fast")
@@ -194,7 +195,6 @@ for l in lyrs:
             l1_bound_t = time.time()-start_time
 
             csv_path = out_dir / f"model_{j}.csv"
-            print("okkk")
             with open(csv_path, "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(["constant type", "value", "seconds required"])

@@ -1,10 +1,9 @@
 from pathlib import Path
 import torch
 from torchvision.models import alexnet, AlexNet_Weights
-from torchvision import transforms
-from torch.utils.data import DataLoader, ConcatDataset
+from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
-from utils import lipschitz_from_fmoc, save_moc
+from utils import save_moc
 import kagglehub
 import numpy as np 
 import time
@@ -17,15 +16,16 @@ import FMCA
 def minibatchmoc(loader, tr_model, un_model, TX,qX, nbins, norm, split_name, C):
     start = time.time()
     dmoc = FMCA.DiscreteModulusOfContinuity()
+    #determine the grid, it will be shared for other batches.
     dmoc.init(
-        np.empty((1, 1), dtype=np.float64),   # dummy
-        np.empty((1, 1), dtype=np.float64),   # dummy
+        np.empty((1, 1), dtype=np.float64),  
+        np.empty((1, 1), dtype=np.float64),  
         TX, qX, nbins, norm, norm
     )
     t_values = dmoc.tgrid()
     NT = len(t_values)
 
-    #save on disk the very first grid, it will be the same for every other batch/split
+   
     save_moc(t_values,save_path, f"batchdeltas_dmoc_{C}_{norm[0]}")
 
     final_moc_tr = np.zeros(NT)
@@ -50,7 +50,7 @@ def minibatchmoc(loader, tr_model, un_model, TX,qX, nbins, norm, split_name, C):
         labels_np = labels.cpu().numpy()
 
 
-        P = np.ascontiguousarray(P.T, dtype=np.float64) #points as columns 
+        P = np.ascontiguousarray(P.T, dtype=np.float64) #points as columns in FMCA
         F_trained =  np.ascontiguousarray(F_trained.T, dtype=np.float64)  
         F_untrained = np.ascontiguousarray(F_untrained.T, dtype=np.float64)
 
@@ -58,17 +58,16 @@ def minibatchmoc(loader, tr_model, un_model, TX,qX, nbins, norm, split_name, C):
         F_data = np.eye(num_classes)[labels_np] 
         F_data = np.ascontiguousarray(F_data.T, dtype=np.float64)
 
-        # --- trained ---
+
         dmoc_tr = FMCA.DiscreteModulusOfContinuity()
         dmoc_tr.init(P, F_trained, TX, qX, nbins, norm, norm)
         batch_tr = dmoc_tr.omegat()
 
-        # --- untrained ---
+
         dmoc_un = FMCA.DiscreteModulusOfContinuity()
         dmoc_un.init(P, F_untrained, TX, qX, nbins, norm, norm)
         batch_un = dmoc_un.omegat()
 
-        # --- data ---
         dmoc_data = FMCA.DiscreteModulusOfContinuity()
         dmoc_data.init(P, F_data, TX, qX, nbins, norm, norm)
         batch_data = dmoc_data.omegat()
@@ -88,8 +87,7 @@ def minibatchmoc(loader, tr_model, un_model, TX,qX, nbins, norm, split_name, C):
 
 
 
-BATCH_SIZES = [10,100,1000]  #batch size that fits in memory
-#compute u_b, l_b for TX, qX 
+BATCH_SIZES = [10,100,1000]  
 qX = 0.0001
 TX = 1000
 nbins =10000
@@ -100,7 +98,6 @@ torch.manual_seed(0)
 
 weights = AlexNet_Weights.DEFAULT
 transform = weights.transforms()
-#model = alexnet(weights=weights)
 un_model = alexnet(weights=None).to(device)
 tr_model = alexnet(weights=weights).to(device)
 un_model.eval()
@@ -126,9 +123,9 @@ val_dir = Path(path) / "ILSVRC" / "Data" / "CLS-LOC" / "val"
 val_ds = ImageFolder(val_dir, transform=transform)
 
 
-norms = ["EUCLIDEAN","TAXICAB"] #["EUCLIDEAN", "TAXICAB"]
-#conceptually   Pdata = dataList[b*C:b*C+C] and same for F 
+norms = ["EUCLIDEAN"] 
 
+#assumes the dataset is already shuffled 
 for C in BATCH_SIZES:
 
     train_loader = DataLoader(
@@ -153,9 +150,8 @@ for C in BATCH_SIZES:
     for norm in norms:
         minibatchmoc(val_loader, tr_model, un_model, TX,qX, nbins, norm, "test", C)
         minibatchmoc(train_loader, tr_model, un_model, TX,qX, nbins, norm, "train", C)
-        # minibatchmoc(full_loader, tr_model, un_model, TX,qX, nbins, norm, "union", C) 
         for type in ["trained", "untrained", "data"]:
-            #load train_moc, test_moc at saved location. (rmk: no cross batch interactions)
+            #load train_moc, test_moc at saved location. (rmk: no cross batch interactions, seq scanning allows a max trick for union)
             train_moc =  np.loadtxt(save_path/f"{type}_batchtrain_dmoc_{C}_{norm[0]}.csv", delimiter=",")
             test_moc =  np.loadtxt(save_path/f"{type}_batchtest_dmoc_{C}_{norm[0]}.csv", delimiter=",")
             union_moc = np.maximum(test_moc, train_moc)

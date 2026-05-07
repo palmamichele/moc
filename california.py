@@ -1,10 +1,9 @@
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import fetch_california_housing
-from torch.utils.data import TensorDataset, DataLoader, Subset
+from torch.utils.data import TensorDataset, DataLoader
 from eclipse_nn.LipConstEstimator import LipConstEstimator
 from sklearn.preprocessing import StandardScaler
-from sklearn.datasets import load_iris
 from sklearn.metrics import r2_score
 from utils import NeuralNet, export_split_to_csv
 import numpy as np
@@ -14,12 +13,11 @@ import torch.optim as optim
 import time
 import csv
 import copy
-import pandas as pd 
 
 np.random.seed(0)
 torch.manual_seed(0)
 
-n_experiments=1
+n_experiments=1 
 base_path = Path("data")
 save_path = base_path / "california"
 save_path.mkdir(parents=True, exist_ok=True)
@@ -62,21 +60,21 @@ n_epochs=500
 out_dir = Path("experiments") / "california"
 out_dir.mkdir(parents=True, exist_ok=True)
 
-lyrs = [3, 20, 5]  #[2, 5, 10, 20, 30, 50, 75, 100]
-neurons = [50, 100, 200] #[20, 40, 60, 80, 100]
+lyrs = [3, 20, 5] 
+neurons = [50, 100, 200] 
 j=0
 for l in lyrs:
     for n in neurons:
         for i in range(n_experiments):
-            model = NeuralNet(hidden_layers=l, hidden_units=n, input_size=8, output_size=1) #if hidden_layers=0, hidden_units=0 -> linear-california
+            model = NeuralNet(hidden_layers=l, hidden_units=n, input_size=8, output_size=1)
             un_model = copy.deepcopy(model)
             criterion = nn.MSELoss()
             optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
             
-            if l==lyrs[-1]: #e.g. last size, overfitting case
+            if l==lyrs[-1]: #overfitting case
                X_train_tensor=X_train_tensor[:5]
                y_train_tensor=y_train_tensor[:5]
-               n_epochs=100 #can be changed
+               n_epochs=100 
 
 
         
@@ -159,6 +157,5 @@ for l in lyrs:
             
             j=j+1
 
-        print("done")
 
-exit()
+

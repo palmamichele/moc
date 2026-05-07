@@ -4,7 +4,6 @@ from sklearn.datasets import fetch_california_housing
 from torch.utils.data import TensorDataset, DataLoader
 from eclipse_nn.LipConstEstimator import LipConstEstimator
 from sklearn.preprocessing import StandardScaler
-from sklearn.datasets import load_iris
 from sklearn.metrics import r2_score
 from utils import NeuralNet, export_split_to_csv, LipConstEstimatorL1
 import numpy as np
@@ -14,7 +13,6 @@ import torch.optim as optim
 import time
 import csv
 import copy
-import pandas as pd 
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -63,7 +61,7 @@ out_dir = Path("experiments") / "linear-california"
 out_dir.mkdir(parents=True, exist_ok=True)
 
 for i in range(n_experiments):
-    model = NeuralNet(hidden_layers=0, hidden_units=0, input_size=8, output_size=1) #if hidden_layers=0, hidden_units=0 -> linear-california
+    model = NeuralNet(hidden_layers=0, hidden_units=0, input_size=8, output_size=1) 
     un_model = copy.deepcopy(model)
     criterion = nn.MSELoss()
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -141,12 +139,7 @@ for i in range(n_experiments):
         writer.writerow(["trivial_l1", l1_bound, l1_bound_t ])
         writer.writerow(["ECLipsE", lip_eclipse, lip_eclipse_t])
         writer.writerow(["ECLipsE_Fast", lip_eclipse_fast, lip_eclipse_fast_t])
-        #ECLIPSE: (for one layers  if l == 1:
-        # W = weights[0]
-        # # exact for a single linear layer
-        # return torch.linalg.matrix_norm(W, ord=2), exit_code)
+   
 
 
-print("done")
 
-exit()

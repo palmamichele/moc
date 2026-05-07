@@ -1,15 +1,13 @@
-%enter each folder containing initializations for same net
+%enter each folder containing initializations for same net, enter MNIST>minibatch; alexnet 
 files = dir(pwd);
 modelname="imagenet-minibatch"
 
 outStatsDir = fullfile(pwd, 'stats');
-% make sure the folder exists
 if ~exist(outStatsDir, 'dir')
     mkdir(outStatsDir);
 end
 
 outPlotDir = fullfile(pwd, 'plots');
-% make sure the folder exists
 if ~exist(outPlotDir, 'dir')
     mkdir(outPlotDir);
 end
@@ -24,13 +22,12 @@ end
 %     end
 % end
 
-experiments = [10,100,1000,10000,70000];%[10,100,1000]%[10,100,1000,10000,70000];
+experiments = [10,100,1000];%use [10,100,1000,10000,70000] for MNIST;
 n_experiments = length(experiments);
-disp(n_experiments)
     
-for norm = ["E", "T"]
+for norm = ["E"]
     
-    for type = ["union", "train", "test"]
+    for type = ["union"]%["union", "train", "test"]
         L_tr = zeros(n_experiments,1);
         deltas_all = cell(n_experiments,1);
         tr_all     = cell(n_experiments,1);
@@ -38,14 +35,13 @@ for norm = ["E", "T"]
 
         for i = 1:n_experiments
             k = experiments(i);
-            %load all net mocs (both trained, untrained)
-            deltas_all{i} = readmatrix(sprintf('deltas_dmoc_%d_%s.csv', k, norm)); %readmatrix(sprintf('batchdeltas_dmoc_%d_%s.csv', k, norm)); %
-            tr_all{i}     = readmatrix(sprintf('%s_trained_dmoc_%d_%s.csv', type, k, norm)); %readmatrix(sprintf('trained_batch%s_dmoc_%d_%s.csv', type, k, norm)); %
+            deltas_all{i} = readmatrix(sprintf('batchdeltas_dmoc_%d_%s.csv', k, norm)); 
+            tr_all{i}     = readmatrix(sprintf('untrained_batchunion_dmoc_%d_%s.csv', k, norm)); 
             %un_all{k+1}     = readmatrix(sprintf('%s_untrained_dmoc_%d_%s.csv', type, k, norm));
         end 
-        %extract grid (same for all experiments)
         
-
+        
+        %extract grid (same for all experiments)
         tgrid = deltas_all{1}(:,1);
         nT = length(tgrid);
         
@@ -73,7 +69,7 @@ for norm = ["E", "T"]
         for i = 1:n_experiments
             k = experiments(i);
             outFile = fullfile(outPlotDir, ...
-                sprintf('%s_%d_%s_%s_%s.txt', modelname, k, type, norm));
+                sprintf('un%s_%d_%s_%s_%s.txt', modelname, k, type, norm));
 
             writematrix( ...
                 [tgrid(idx), omega_tr(i, idx)'], ...

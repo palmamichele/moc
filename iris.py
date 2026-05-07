@@ -1,11 +1,8 @@
 from pathlib import Path
 from sklearn.model_selection import train_test_split
-from sklearn.datasets import fetch_california_housing
 from torch.utils.data import TensorDataset, DataLoader
 from eclipse_nn.LipConstEstimator import LipConstEstimator
-from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import load_iris
-from sklearn.metrics import r2_score
 from utils import NeuralNet, export_split_to_csv, LipConstEstimatorL1
 import numpy as np
 import torch.nn as nn
@@ -14,13 +11,12 @@ import torch.optim as optim
 import time
 import csv
 import copy
-import pandas as pd 
+
 
 np.random.seed(0)
 torch.manual_seed(0)
 
 n_experiments=1
-#iris,
 save_path = Path("data") / "iris"
 out_dir = Path("experiments") / "iris"
 save_path.mkdir(parents=True, exist_ok=True)
@@ -31,7 +27,6 @@ X = iris_data.data.astype(np.float32)
 y = iris_data.target.astype(np.int64)
 num_classes = len(iris_data.target_names)
 
-# Split into train/test sets
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=0, stratify=y
 )
@@ -47,7 +42,6 @@ y_test_class_tensor = torch.tensor(y_test, dtype=torch.long)
 y_train_export_tensor = torch.tensor(y_train_onehot, dtype=torch.float32)
 y_test_export_tensor = torch.tensor(y_test_onehot, dtype=torch.float32)
 
-# loaders for export_split_to_csv
 train_loader = DataLoader(
     TensorDataset(X_train_tensor, y_train_export_tensor),
     batch_size=1,
@@ -62,13 +56,13 @@ test_loader = DataLoader(
 
 
 n_epochs=500
-lyrs = [3, 20, 5]  #[2, 5, 10, 20, 30, 50, 75, 100]
-neurons = [50, 100, 200] #[20, 40, 60, 80, 100]
+lyrs = [3, 20, 5]  
+neurons = [50, 100, 200]
 j=0
 for l in lyrs:
     for n in neurons:
         for i in range(n_experiments):
-            model = NeuralNet(hidden_layers=l, hidden_units=n, input_size=len(X_train[0]), output_size=num_classes) #if hidden_layers=0, hidden_units=0 -> linear-california
+            model = NeuralNet(hidden_layers=l, hidden_units=n, input_size=len(X_train[0]), output_size=num_classes) 
             un_model = copy.deepcopy(model)
             criterion = nn.CrossEntropyLoss()
             optimizer = optim.SGD(model.parameters(), lr=0.01)
@@ -76,7 +70,7 @@ for l in lyrs:
             if l==lyrs[-1]: #e.g. last size, overfitting case
                 X_train_tensor=X_train_tensor[:5]
                 y_train_class_tensor=y_train_class_tensor[:5]
-                n_epochs=100 #can be changed
+                n_epochs=100 
         
 
             model.train()
@@ -110,11 +104,9 @@ for l in lyrs:
             print(f"test acc = {test_acc:.4f}")
 
 
-            # wrap models so export function writes probabilities instead of raw logits
+            # wrap models so it includes softmax head as last layer
             model = nn.Sequential(model, nn.Softmax(dim=1))
             un_model = nn.Sequential(un_model, nn.Softmax(dim=1))
-
-            # export using your existing function
             export_split_to_csv(train_loader, "train", model, un_model, save_path, j)
             export_split_to_csv(test_loader, "test", model, un_model, save_path, j)
 
@@ -149,7 +141,7 @@ for l in lyrs:
             csv_path = out_dir / f"model_{j}.csv"
             with open(csv_path, "w", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(["constant type", "value", "seconds required"]) #trivial must be adj for softmaxhead
+                writer.writerow(["constant type", "value", "seconds required"]) #trivial must be here adj for softmaxhead
                 writer.writerow(["trivial_l2", lip_trivial, lip_trivial_t ])
                 writer.writerow(["trivial_l1", l1_bound, l1_bound_t ]) 
                 writer.writerow(["ECLipsE", lip_eclipse, lip_eclipse_t])
@@ -159,32 +151,3 @@ for l in lyrs:
 
             
             j=j+1
-
-        print("done")
-
-exit()
-
-
-
-
-
-
-
-#we know that without ReLU, the Lipschitz constant coincides with the operator norm, we check how far we are from it.
-
-#might be beneficial to visualize the normalized lipschitz estimates
-
-#the color will denote different models/benchmarks (exact, upper bound, eclipse, our moc,..., etc)
-
-#one plot for each configuration  e.g. (in_s, out_s), the x axis denotes the number of datapoints used in moc, lsh moc....
-
-
-
-
-
-
-#for each network, export the reference dataset (divided among train and test), in the same format as the network would see it (e.g. after transforms), export the reference output for the net/layers for which moc has to be computed. 
-
-#using l_2 we do flattening for matrices/tensors 
-
-

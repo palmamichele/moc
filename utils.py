@@ -1,4 +1,3 @@
-
 import numpy as np 
 import matplotlib.pyplot as plt 
 import csv
@@ -15,7 +14,7 @@ class LipConstEstimatorL1():
         self.weights = []
         self.num_layers = 0
         
-        # Traverse model modules to extract Linear weights
+        
         for module in model.modules():
             if isinstance(module, torch.nn.Linear):
                 self.weights.append(module.weight.data)  
@@ -30,7 +29,7 @@ class LipConstEstimatorL1():
         """trivial bound:|W|_1 = max column sum of |W|"""
         l1_norms = []
         for w in self.weights:
-            col_sums = torch.sum(torch.abs(w), dim=0)  # Sum over input dim (rows)
+            col_sums = torch.sum(torch.abs(w), dim=0) 
             l1_norm = torch.max(col_sums)
             l1_norms.append(l1_norm)
         
@@ -125,20 +124,20 @@ class NeuralNet(nn.Module):
         
         layers = []
         
-        # first hidden layer
+        
         if hidden_layers > 0:
             layers.append(nn.Linear(input_size, hidden_units))
             layers.append(nn.ReLU())
             
-            # remaining hidden layers
+            
             for _ in range(hidden_layers - 1):
                 layers.append(nn.Linear(hidden_units, hidden_units))
                 layers.append(nn.ReLU())
             
-            # output layer
+           
             layers.append(nn.Linear(hidden_units, output_size))
         else:
-            # no hidden layer case
+            
             layers.append(nn.Linear(input_size, output_size))
         
         self.linear_relu_stack = nn.Sequential(*layers)
