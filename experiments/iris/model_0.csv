@@ -1,7 +1,0 @@
-constant type,value,seconds required
-trivial_l2,130.38154901594098,0.0031118392944335938
-trivial_l1,315.25262451171875,0.0017898082733154297
-ECLipsE,"tensor(2.4341, dtype=torch.float64)",5.817421197891235
-ECLipsE_Fast,"tensor(2.4341, dtype=torch.float64)",0.0024230480194091797
-accuracy on train,0.9666666388511658,0
-accuracy on test,1.0,0

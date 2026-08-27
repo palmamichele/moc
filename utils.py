@@ -5,6 +5,200 @@ import torch
 from torch import nn, optim
 from pathlib import Path
 
+
+def pgd_attack(
+    model,
+    images,
+    labels,
+    criterion,
+    epsilon=0.3,
+    alpha=0.01,
+    num_iter=40
+):
+    """
+    Untargeted L2-PGD adversarial attack.
+
+    images:
+        normalized MNIST images in [-1, 1]
+
+    epsilon:
+        L2 perturbation radius in original [0, 1] pixel space
+
+    alpha:
+        L2 PGD step size in original [0, 1] pixel space
+    """
+
+    #denormalize images to [0, 1] range (specific to MNIST)
+    original_images = images * 0.5 + 0.5
+    original_images = original_images.detach()
+    delta = torch.randn_like(original_images)
+    delta_flat = delta.view(delta.size(0), -1)
+
+    delta_norm = torch.norm(
+        delta_flat,
+        p=2,
+        dim=1,
+        keepdim=True
+    )
+
+    
+    direction = delta_flat / (delta_norm + 1e-12)
+
+    #uniformly sample a point inside the L2 ball
+    d = delta_flat.size(1)
+    u = torch.rand(
+        delta.size(0),
+        1,
+        device=images.device
+    )
+
+    radius = epsilon * u.pow(1.0 / d)
+
+    delta_flat = direction * radius
+
+    delta = delta_flat.view_as(original_images)
+
+    
+    adv_images = original_images + delta
+
+   
+    adv_images = torch.clamp(
+        adv_images,
+        0.0,
+        1.0
+    )
+
+
+    for _ in range(num_iter):
+
+        adv_images.requires_grad_(True)
+
+
+        normalized_adv_images = (
+            adv_images - 0.5
+        ) / 0.5
+
+        logits = model(normalized_adv_images)
+
+
+        loss = criterion(logits, labels)
+
+    
+
+        grad = torch.autograd.grad(
+            loss,
+            adv_images
+        )[0]
+
+        grad_flat = grad.view(
+            grad.size(0),
+            -1
+        )
+
+        grad_norm = torch.norm(
+            grad_flat,
+            p=2,
+            dim=1,
+            keepdim=True
+        )
+
+        normalized_grad = (
+            grad_flat
+            / (grad_norm + 1e-12)
+        )
+
+        normalized_grad = normalized_grad.view_as(grad)
+
+
+        adv_images = (
+            adv_images.detach()
+            + alpha * normalized_grad
+        )
+
+
+        delta = adv_images - original_images
+
+        delta_flat = delta.view(
+            delta.size(0),
+            -1
+        )
+
+        delta_norm = torch.norm(
+            delta_flat,
+            p=2,
+            dim=1,
+            keepdim=True
+        )
+
+        # If norm > epsilon, scale it back
+        scale = torch.minimum(
+            torch.ones_like(delta_norm),
+            epsilon / (delta_norm + 1e-12)
+        )
+
+        delta_flat = delta_flat * scale
+
+        delta = delta_flat.view_as(adv_images)
+
+
+        adv_images = original_images + delta
+
+
+        adv_images = torch.clamp(
+            adv_images,
+            0.0,
+            1.0
+        )
+
+
+    adv_images = (
+        adv_images - 0.5
+    ) / 0.5
+
+    return adv_images.detach()
+
+def accuracy_under_attack(
+    model,
+    data_loader,
+    criterion,
+    epsilon=0.3,
+    alpha=0.01,
+    num_iter=40
+):
+    """
+    Accuracy under an untargeted L2-PGD attack.
+    """
+
+    model.eval()
+
+    correct = 0
+    total = 0
+
+    for images, labels in data_loader:
+
+        # Generate L2-PGD adversarial examples
+        adv_images = pgd_attack(
+            model=model,
+            images=images,
+            labels=labels,
+            criterion=criterion,
+            epsilon=epsilon,
+            alpha=alpha,
+            num_iter=num_iter
+        )
+
+        # Evaluate adversarial examples
+        with torch.no_grad():
+            logits = model(adv_images)
+            preds = logits.argmax(dim=1)
+
+        correct += (preds == labels).sum().item()
+        total += labels.size(0)
+
+    return correct / total
+
+
+
 class LipConstEstimatorL1():
     def __init__(self, model):
         """

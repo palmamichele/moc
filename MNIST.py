@@ -2,14 +2,38 @@ from pathlib import Path
 import torch
 import copy 
 import csv
+import sys 
 import time 
 import torchvision.transforms as transforms
 import numpy as np 
 from torch import nn, optim
 from torch.utils.data import DataLoader,  TensorDataset, Subset
 from torchvision.datasets import MNIST
-from utils import export_split_to_csv, NeuralNet, LipConstEstimatorL1
+from utils import export_split_to_csv, NeuralNet, LipConstEstimatorL1, pgd_attack, accuracy_under_attack
 from eclipse_nn.LipConstEstimator import LipConstEstimator
+
+
+class Tee:
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, data):
+        for f in self.files:
+            f.write(data)
+            f.flush()
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+
+
+
+# PGD parameters
+epsilon = 0.1
+alpha = 0.01
+num_iter = 40
+
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -24,6 +48,10 @@ torch.backends.cudnn.benchmark = False
 
 out_dir = Path("experiments") / "MNIST"
 out_dir.mkdir(parents=True, exist_ok=True)
+
+log_file = open(out_dir/"log.txt", "w", encoding="utf-8")
+sys.stdout = Tee(sys.__stdout__, log_file)
+sys.stderr = Tee(sys.__stderr__, log_file)
 
 lyrs = [3, 20, 5] 
 neurons = [50, 100, 200]
@@ -116,8 +144,9 @@ for l in lyrs:
             model.train()
             
             for epoch in range(num_epochs):
+                loss = 0.0
                 for images, labels in train_loader:
-                  
+                    
                     optimizer.zero_grad()
                     logits = model(images)
                     loss = criterion(logits, labels)
@@ -149,6 +178,19 @@ for l in lyrs:
                 test_acc = test_correct / test_total
             print(f"train acc = {train_acc:.4f}")
             print(f"test acc = {test_acc:.4f}")
+
+
+
+            aua_test = accuracy_under_attack(
+                model=model,
+                data_loader=test_loader,
+                criterion=criterion,
+                epsilon=epsilon,
+                alpha=alpha,
+                num_iter=num_iter
+            )
+
+            print(f"accuracy under attack (test loader) = {aua_test:.4f}")
 
 
             #save softmax output from the model

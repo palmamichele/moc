@@ -6,6 +6,7 @@
 
 ## Installation
 It is recommended to create a virtual environment before installing dependencies.
+suggested python >=3.14
 
 ## Create a virtual environment
 ```bash
@@ -15,10 +16,9 @@ pip install -r requirements.txt
 
 ## Ensure OpenMP is available in your compiler configured in CMAKE (e.g. g++)
 ```bash
-export CC=/opt/homebrew/bin/gcc-15  
-export CXX=/opt/homebrew/bin/g++-15
+export CC=/opt/homebrew/bin/gcc-16  
+export CXX=/opt/homebrew/bin/g++-16
 ```
-
 
 ## Install pybind11 (sugg. via homebrew )
 

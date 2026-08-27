@@ -16,7 +16,7 @@ save_path = Path("experiments")
 norms = ["EUCLIDEAN"]
 
 
-for mdl in ["linear-california", "california", "iris", "MNIST"]:
+for mdl in ["MNIST"]: #["linear-california", "california", "iris", "MNIST"]:
     folder_path = save_path / str(mdl) 
     folder_path.mkdir(parents=True, exist_ok=True)
 

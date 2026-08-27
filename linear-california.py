@@ -115,15 +115,15 @@ for i in range(n_experiments):
     lip_eclipse_fast_t=0
 
 
-    start_time = time.time()
-    est = LipConstEstimator(model=model)
-    lip_eclipse = est.estimate(method="ECLipsE")
-    lip_eclipse_t = time.time()-start_time
+    # start_time = time.time()
+    # est = LipConstEstimator(model=model)
+    # lip_eclipse = est.estimate(method="ECLipsE")
+    # lip_eclipse_t = time.time()-start_time
 
-    start_time = time.time()
-    est = LipConstEstimator(model=model)
-    lip_eclipse_fast = est.estimate(method="ECLipsE_Fast")
-    lip_eclipse_fast_t = time.time()-start_time
+    # start_time = time.time()
+    # est = LipConstEstimator(model=model)
+    # lip_eclipse_fast = est.estimate(method="ECLipsE_Fast")
+    # lip_eclipse_fast_t = time.time()-start_time
 
     start_time = time.time()
     estimator_l1 = LipConstEstimatorL1(model=model)
@@ -137,8 +137,10 @@ for i in range(n_experiments):
         writer.writerow(["constant type", "value", "seconds required"])
         writer.writerow(["trivial_l2", lip_trivial, lip_trivial_t ])
         writer.writerow(["trivial_l1", l1_bound, l1_bound_t ])
-        writer.writerow(["ECLipsE", lip_eclipse, lip_eclipse_t])
-        writer.writerow(["ECLipsE_Fast", lip_eclipse_fast, lip_eclipse_fast_t])
+        writer.writerow(["train MSE", train_mse, 0])
+        writer.writerow(["test MSE", test_mse, 0])
+        # writer.writerow(["ECLipsE", lip_eclipse, lip_eclipse_t])
+        # writer.writerow(["ECLipsE_Fast", lip_eclipse_fast, lip_eclipse_fast_t])
    
 
 

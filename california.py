@@ -153,6 +153,8 @@ for l in lyrs:
                 writer.writerow(["ECLipsE_Fast", lip_eclipse_fast, lip_eclipse_fast_t])
                 writer.writerow(["R^2 on train", train_r2, 0])
                 writer.writerow(["R^2 on test", test_r2, 0])
+                writer.writerow(["mse on train", train_mse, 0])
+                writer.writerow(["mse on test", test_mse, 0])
 
             
             j=j+1

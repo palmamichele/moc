@@ -1,6 +1,6 @@
 %enter each folder containing initializations for same net, enter MNIST>minibatch; alexnet 
 files = dir(pwd);
-modelname="imagenet-minibatch"
+modelname="cifar"
 
 outStatsDir = fullfile(pwd, 'stats');
 if ~exist(outStatsDir, 'dir')
@@ -22,7 +22,7 @@ end
 %     end
 % end
 
-experiments = [10,100,1000];%use [10,100,1000,10000,70000] for MNIST;
+experiments = [10,100,1000] %[10,100,1000];%use [10,100,1000,10000,70000] for MNIST;
 n_experiments = length(experiments);
     
 for norm = ["E"]
@@ -35,9 +35,9 @@ for norm = ["E"]
 
         for i = 1:n_experiments
             k = experiments(i);
-            deltas_all{i} = readmatrix(sprintf('batchdeltas_dmoc_%d_%s.csv', k, norm)); 
-            tr_all{i}     = readmatrix(sprintf('untrained_batchunion_dmoc_%d_%s.csv', k, norm)); 
-            %un_all{k+1}     = readmatrix(sprintf('%s_untrained_dmoc_%d_%s.csv', type, k, norm));
+            deltas_all{i} = readmatrix(sprintf('deltas_dmoc_%d_%s.csv', k, norm)); 
+            tr_all{i}     = readmatrix(sprintf('union_trained_dmoc_%d_%s.csv', k, norm)); 
+            un_all{k+1}     = readmatrix(sprintf('union_untrained_dmoc_%d_%s.csv', k, norm));
         end 
         
         
@@ -69,7 +69,7 @@ for norm = ["E"]
         for i = 1:n_experiments
             k = experiments(i);
             outFile = fullfile(outPlotDir, ...
-                sprintf('un%s_%d_%s_%s_%s.txt', modelname, k, type, norm));
+                sprintf('%s_%d_%s_%s_%s.txt', modelname, k, type, norm));
 
             writematrix( ...
                 [tgrid(idx), omega_tr(i, idx)'], ...
