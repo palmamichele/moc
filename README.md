@@ -58,6 +58,12 @@ make
 cd .. 
 ```  
 
+## Install PGD-MOC
+```bash
+git clone https://github.com/palmamichele/pgdmoc.git
+```  
+
+
 
 ## Download your ImageNet dataset 
 Refer to https://www.kaggle.com/competitions/imagenet-object-localization-challenge/data (suggested kagglehub)

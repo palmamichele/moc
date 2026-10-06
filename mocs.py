@@ -5,18 +5,19 @@ import sys
 import re 
 import matplotlib.pyplot as plt
 from pathlib import Path
+from pgdmoc.pgd_moc import pgd_moc
 from utils import lipschitz_from_fmoc, save_moc
 sys.path.append(str(Path("fmca") / "build" / "py"))
 import FMCA
 
 
 np.random.seed(0)
-nbins=10000
+nbins=100
 save_path = Path("experiments")
 norms = ["EUCLIDEAN"]
 
 
-for mdl in ["MNIST"]: #["linear-california", "california", "iris", "MNIST"]:
+for mdl in ["iris"]: #["linear-california", "california", "iris", "MNIST"]:
     folder_path = save_path / str(mdl) 
     folder_path.mkdir(parents=True, exist_ok=True)
 
@@ -86,66 +87,75 @@ for mdl in ["MNIST"]: #["linear-california", "california", "iris", "MNIST"]:
             save_moc(data_m,folder_path, f"union_data_dmoc_{norm[0]}")
             save_moc(t_values,folder_path, f"deltas_dmoc_{i}_{norm[0]}")
 
-            start_time = time.time()
-            lip_moc = lipschitz_from_fmoc(tr_m, t_values)
-            lip_moc_t = time.time()-start_time
 
-            csv_path = folder_path / f"model_{i}.csv"
-            with open(csv_path, "a", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow([f"dmoc_union_{norm[0]}", lip_moc, tr_t+lip_moc_t ])
+
+            # pgd_t = time.time() - start_time
+
+            # print(f"DMOC time:    {data_t:.6f} s")
+            # print(f"PGD-MOC time: {pgd_t:.6f} s")
+
+            # start_time = time.time()
+            # lip_moc = lipschitz_from_fmoc(tr_m, t_values)
+            # lip_moc_t = time.time()-start_time
+
+            # csv_path = folder_path / f"model_{i}.csv"
+            # with open(csv_path, "a", newline="") as f:
+            #     writer = csv.writer(f)
+            #     writer.writerow([f"dmoc_union_{norm[0]}", lip_moc, tr_t+lip_moc_t ])
                 
 
 
-            max_distance = t_values[-1]
-            min_distance = t_values[0]
+            # max_distance = t_values[-1]
+            # min_distance = t_values[0]
 
-            for type in ["train", "test"]:
-                X = np.loadtxt(filename/("X_"+type+".csv"), delimiter=",",ndmin=2)
-                Y = np.loadtxt(filename/("Y_"+type+".csv"), delimiter="," , ndmin=2)
-                F = np.loadtxt(filename/("F_"+type+f"_{i}.csv"), delimiter="," , ndmin=2)
-                F_un = np.loadtxt(filename/("F_un_"+type+f"_{i}.csv"), delimiter="," , ndmin=2)
+            # for type in ["train", "test"]:
+            #     X = np.loadtxt(filename/("X_"+type+".csv"), delimiter=",",ndmin=2)
+            #     Y = np.loadtxt(filename/("Y_"+type+".csv"), delimiter="," , ndmin=2)
+            #     F = np.loadtxt(filename/("F_"+type+f"_{i}.csv"), delimiter="," , ndmin=2)
+            #     F_un = np.loadtxt(filename/("F_un_"+type+f"_{i}.csv"), delimiter="," , ndmin=2)
 
-                X = X.transpose()
-                Y=Y.transpose()
-                F = F.transpose()
-                F_un = F_un.transpose()
+            #     X = X.transpose()
+            #     Y=Y.transpose()
+            #     F = F.transpose()
+            #     F_un = F_un.transpose()
 
                
-                dmoc = FMCA.DiscreteModulusOfContinuity()
-                start_time = time.time()  
-                dmoc.init(X,Y, max_distance, min_distance, nbins, norm, norm)
-                data_m = dmoc.omegat()
-                data_t = time.time() - start_time 
+            #     dmoc = FMCA.DiscreteModulusOfContinuity()
+            #     start_time = time.time()  
+            #     dmoc.init(X,Y, max_distance, min_distance, nbins, norm, norm)
+            #     data_m = dmoc.omegat()
+            #     data_t = time.time() - start_time 
 
    
-                dmoc = FMCA.DiscreteModulusOfContinuity()
-                start_time = time.time()  
-                dmoc.init(X,F, max_distance, min_distance, nbins,norm, norm)
-                tr_m = dmoc.omegat()
-                tr_t = time.time() - start_time 
+            #     dmoc = FMCA.DiscreteModulusOfContinuity()
+            #     start_time = time.time()  
+            #     dmoc.init(X,F, max_distance, min_distance, nbins,norm, norm)
+            #     tr_m = dmoc.omegat()
+            #     tr_t = time.time() - start_time 
                 
 
             
-                dmoc = FMCA.DiscreteModulusOfContinuity()
-                start_time = time.time() 
-                dmoc.init(X,F_un, max_distance, min_distance, nbins,norm, norm)
-                un_m = dmoc.omegat()
+            #     dmoc = FMCA.DiscreteModulusOfContinuity()
+            #     start_time = time.time() 
+            #     dmoc.init(X,F_un, max_distance, min_distance, nbins,norm, norm)
+            #     un_m = dmoc.omegat()
+
+               
 
 
-                save_moc(un_m,folder_path, type+f"_untrained_dmoc_{i}_{norm[0]}")
-                save_moc(tr_m,folder_path, type+f"_trained_dmoc_{i}_{norm[0]}")
-                save_moc(data_m,folder_path, type+f"_data_dmoc_{norm[0]}")
-                save_moc(t_values,folder_path, type+f"_deltas_dmoc_{i}_{norm[0]}")
+            #     save_moc(un_m,folder_path, type+f"_untrained_dmoc_{i}_{norm[0]}")
+            #     save_moc(tr_m,folder_path, type+f"_trained_dmoc_{i}_{norm[0]}")
+            #     save_moc(data_m,folder_path, type+f"_data_dmoc_{norm[0]}")
+            #     save_moc(t_values,folder_path, type+f"_deltas_dmoc_{i}_{norm[0]}")
 
-                start_time = time.time()
-                lip_moc = lipschitz_from_fmoc(tr_m, t_values)
-                lip_moc_t = time.time()-start_time
+            #     start_time = time.time()
+            #     lip_moc = lipschitz_from_fmoc(tr_m, t_values)
+            #     lip_moc_t = time.time()-start_time
 
-                csv_path = folder_path / f"model_{i}.csv"
-                with open(csv_path, "a", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerow([f"dmoc_{type}_{norm[0]}", lip_moc, tr_t+lip_moc_t ])
+            #     csv_path = folder_path / f"model_{i}.csv"
+            #     with open(csv_path, "a", newline="") as f:
+            #         writer = csv.writer(f)
+            #         writer.writerow([f"dmoc_{type}_{norm[0]}", lip_moc, tr_t+lip_moc_t ])
                
 
 

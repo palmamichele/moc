@@ -9,7 +9,7 @@ import numpy as np
 from torch import nn, optim
 from torch.utils.data import DataLoader,  TensorDataset, Subset
 from torchvision.datasets import MNIST
-from utils import export_split_to_csv, NeuralNet, LipConstEstimatorL1,  pgd_attack, accuracy_under_attack
+from utils import export_split_to_csv, NeuralNet, LipConstEstimatorL1, accuracy_under_attack, box_clipping, pgd_m_x
 from eclipse_nn.LipConstEstimator import LipConstEstimator
 
 np.random.seed(0)
@@ -52,13 +52,14 @@ num_classes = 10
 n_experiments=1
 num_epochs = 10 #following ECLipsE mnist code
 
+
 data_path = Path("data")
 # Load the training and test sets
 
 # Transform the data to torch tensors and normalize it
 transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))
+    transforms.ToTensor()
+    #transforms.Normalize((0.5,), (0.5,))
 ])
 
 train_data = MNIST(root=str(data_path), train=True, download=True, transform=transform)
@@ -148,15 +149,10 @@ for l in lyrs:
                 for images, labels in train_loader:
 
                     model.eval()
-                    adv_images = pgd_attack(
-                        model=model,
-                        images=images,
-                        labels=labels,
-                        criterion=criterion,
-                        epsilon=epsilon,
-                        alpha=alpha,
-                        num_iter=num_iter
-                    )
+                    _, deltas = pgd_m_x(model,images, labels,epsilon,criterion,"L2",box_clipping,num_iter,alpha)
+                    
+                    adv_images = images+deltas
+                    
 
                     model.train()
                     optimizer.zero_grad()
@@ -197,12 +193,14 @@ for l in lyrs:
 
 
             aua_test = accuracy_under_attack(
-                model=model,
-                data_loader=test_loader,
-                criterion=criterion,
-                epsilon=epsilon,
-                alpha=alpha,
-                num_iter=num_iter
+                model,
+                test_loader,
+                criterion,
+                box_clipping,
+                "L2",
+                epsilon,
+                alpha,
+                num_iter
             )
 
             print(f"accuracy under attack (test loader) = {aua_test:.4f}")

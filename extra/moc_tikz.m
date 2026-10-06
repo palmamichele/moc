@@ -5,7 +5,7 @@ modelname = "iris";
 %enter the related experiments model directory
 
 % Experiment IDs
-experiments = [0,1,2,3,4,5,6,7,8];
+experiments = [0,4,8];
 
 n_experiments = length(experiments);
 
@@ -17,7 +17,6 @@ type = "union";
 
 % Number of points to save to the output files
 targetN = 100;
-
 
 
 % Current directory
@@ -249,8 +248,8 @@ for i = 1:n_experiments
     outFile = fullfile( ...
         outPlotDir, ...
         sprintf( ...
-            'mnist_%d_%s_%s_.txt', ...
-            k, type, norm));
+            '%s_%d_%s_%s_.txt', ...
+            modelname,k, type, norm));
 
 
     %% ========================================================
