@@ -7,38 +7,40 @@ import sys
 import torchvision.transforms as transforms
 import numpy as np 
 from torch import nn, optim
-from torch.utils.data import DataLoader,  TensorDataset, Subset
+from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
-from utils import export_split_to_csv, NeuralNet, LipConstEstimatorL1, accuracy_under_attack, box_clipping, pgd_m_x
-from eclipse_nn.LipConstEstimator import LipConstEstimator
+from utils import Tee, NeuralNet, accuracy_under_attack, box_clipping, pgd_m_x, pgd_moc
+from pgdmoc.pgd_moc import moc_regularizer
 
-np.random.seed(0)
-torch.manual_seed(0)
+#PARS
+num_experiments=1
+epsilon = 0.3 #usually be 0.3 for MNIST, 8/255 for CIFAR-10, 0.5 for CIFAR-100
+alpha = 0.01 #learning rate for PGD
+num_iter = 30 #of PGD
+num_classes = 10
+num_epochs=10
+num_restarts = 1
+seed=0
+batch_size=128
+nbins=10 #for MOC
+learning_rate = alpha
+norm="L2" #on X space
+clipping=None
+lambda_moc = 0.5
+#
 
-if torch.cuda.is_available():
-    torch.cuda.manual_seed(0)
-    torch.cuda.manual_seed_all(0)
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+np.random.seed(seed)
+torch.manual_seed(seed)
+
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
-class Tee:
-    def __init__(self, *files):
-        self.files = files
-
-    def write(self, data):
-        for f in self.files:
-            f.write(data)
-            f.flush()
-
-    def flush(self):
-        for f in self.files:
-            f.flush()
-
-
-
-
+data_path = Path("data")
 out_dir = Path("experiments") / "MNIST"
 out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -46,219 +48,221 @@ log_file = open(out_dir/"log.txt", "w", encoding="utf-8")
 sys.stdout = Tee(sys.__stdout__, log_file)
 sys.stderr = Tee(sys.__stderr__, log_file)
 
-lyrs = [3, 20, 5] 
-neurons = [50, 100, 200]
-num_classes = 10
-n_experiments=1
-num_epochs = 10 #following ECLipsE mnist code
+def l2_distance(x,y):
+    diff = x-y
+    return diff.flatten(1).norm(p=2, dim=1)
 
 
-data_path = Path("data")
-# Load the training and test sets
 
-# Transform the data to torch tensors and normalize it
+#Load the training and test sets
+
+# Transform the data to torch tensors
 transform = transforms.Compose([
     transforms.ToTensor()
-    #transforms.Normalize((0.5,), (0.5,))
 ])
 
 train_data = MNIST(root=str(data_path), train=True, download=True, transform=transform)
 test_data = MNIST(root=str(data_path), train=False, download=True, transform=transform)
-
-save_path = Path("data") / "MNIST"
-save_path.mkdir(parents=True, exist_ok=True)
-
-# Data loaders
-train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
-test_loader = DataLoader(test_data, batch_size=64, shuffle=False)
-
-#tensors/loaders only for export_split_to_csv
-X_train_list, y_train_list = [], []
-for x, y in train_data:
-    X_train_list.append(x.view(-1))
-    y_train_list.append(y)
-
-X_test_list, y_test_list = [], []
-for x, y in test_data:
-    X_test_list.append(x.view(-1))
-    y_test_list.append(y)
-
-X_train_tensor = torch.stack(X_train_list).float()
-X_test_tensor = torch.stack(X_test_list).float()
-
-y_train = np.array(y_train_list, dtype=np.int64)
-y_test = np.array(y_test_list, dtype=np.int64)
-
-y_train_class_tensor = torch.tensor(y_train, dtype=torch.long)
-y_test_class_tensor = torch.tensor(y_test, dtype=torch.long)
-
-y_train_onehot = np.eye(num_classes, dtype=np.float32)[y_train]
-y_test_onehot = np.eye(num_classes, dtype=np.float32)[y_test]
-
-y_train_export_tensor = torch.tensor(y_train_onehot, dtype=torch.float32)
-y_test_export_tensor = torch.tensor(y_test_onehot, dtype=torch.float32)
+train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False)
+test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
 
 
-y_train_export_tensor = torch.tensor(y_train_onehot, dtype=torch.float32)
-y_test_export_tensor = torch.tensor(y_test_onehot, dtype=torch.float32)
+for i in range(num_experiments):
 
-export_train_loader = DataLoader(
-    TensorDataset(X_train_tensor, y_train_export_tensor),
-    batch_size=1,
-    shuffle=False
-)
+    vanilla_model = NeuralNet(hidden_layers=3, hidden_units=64)
+    un_model = copy.deepcopy(vanilla_model)
+    criterion = nn.CrossEntropyLoss(reduction="none")
+    optimizer = optim.SGD(vanilla_model.parameters(), lr=learning_rate, momentum=0.0)
+
+    vanilla_model.train()
+    for epoch in range(num_epochs):
+        loss = 0.0
+        for images, labels in train_loader:
+
+            optimizer.zero_grad()
+            logits = vanilla_model(images)
+            loss = criterion(logits, labels).mean()
+            loss.backward()
+            optimizer.step()
+
+        print(f'Epoch [{epoch+1}/{num_epochs}], 'f'Training Loss: {loss.item():.4f}')
+    #store train loss of the vanilla model
+
+    X = []
+    Y = []
+    
+    vanilla_model.eval()
+    with torch.no_grad():
+        
+        test_correct = 0
+        test_total = 0
+        for images, labels in test_loader:
+            X.append(images)
+            probs = torch.softmax(vanilla_model(images), dim=1)
+            Y.append(vanilla_model(images))
+            preds = probs.argmax(dim=1)
+            test_total += labels.size(0)
+            test_correct += (preds == labels).sum().item()
+
+        test_acc = test_correct / test_total
+    print(f"clean test acc = {test_acc:.4f}")
+    X = torch.cat(X, dim=0)
+    Y = torch.cat(Y, dim=0)
+
+    aua_test = accuracy_under_attack(
+        vanilla_model,
+        test_loader,
+        criterion,
+        clipping,
+        norm,
+        epsilon,
+        alpha,
+        num_iter
+    )
+
+    print(f"test accuracy under attack  = {aua_test:.4f}")
+    #store test accuracy adv
+
+    #compute the modulus of continuity of the network itself
+    # moc, t_values = pgd_moc(
+    # vanilla_model,
+    # X,
+    # Y, 
+    # criterion, #d_Y as loss function (assuming it satisfies metric properties)
+    # clipping,
+    # norm, #L2, L1, Linf
+    # t_values=None, #t_1,...,t_K
+    # step_size=None, 
+    # numiter=num_iter,
+    # numrestarts=numrestarts,
+    # nbins=nbins,
+    # batch_size=batch_size)
+
+    adv_model = copy.deepcopy(un_model)
+    adv_model.train()
+    optimizer = optim.SGD(adv_model.parameters(), lr=learning_rate, momentum=0.0)
+    for epoch in range(num_epochs):
+        loss = 0.0
+        for images, labels in train_loader:
+
+            _, deltas = pgd_m_x(adv_model,images, labels,epsilon,criterion,norm,clipping,num_iter,alpha)
+            adv_images = images+deltas
+    
+            optimizer.zero_grad()
+            outputs = adv_model(adv_images)
+            loss = criterion(outputs, labels).mean()
+            loss.backward()
+            optimizer.step()
+
+        print(f'Epoch [{epoch+1}/{num_epochs}], 'f'Training Loss (adv): {loss.item():.4f}')
+
+    adv_model.eval()
+    with torch.no_grad():
+        
+        test_correct = 0
+        test_total = 0
+        for images, labels in test_loader:
+            probs = torch.softmax(adv_model(images), dim=1)
+            preds = probs.argmax(dim=1)
+            test_total += labels.size(0)
+            test_correct += (preds == labels).sum().item()
+
+        test_acc = test_correct / test_total
+    print(f"clean test acc (adv) = {test_acc:.4f}")
 
 
+    aua_test = accuracy_under_attack(
+        adv_model,
+        test_loader,
+        criterion,
+        clipping,
+        norm,
+        epsilon,
+        alpha,
+        num_iter
+    )
+
+    print(f"test accuracy under attack (adv)  = {aua_test:.4f}")
 
 
-export_test_loader = DataLoader(
-    TensorDataset(X_test_tensor, y_test_export_tensor),
-    batch_size=1,
-    shuffle=False
-)
+    moc_model = copy.deepcopy(un_model)
+    moc_model.train()
 
+  
+    # X_reference = torch.stack([
+    #     train_data[i][0]
+    #     for i in range(len(train_data))
+    # ])
+    optimizer = optim.SGD(moc_model.parameters(), lr=learning_rate, momentum=0.0)
+    for epoch in range(num_epochs):
 
+        total_clean_loss = 0.0
+        total_moc_loss = 0.0
 
-# PGD parameters
-epsilon = 0.6 #usually be 0.3 for MNIST, 8/255 for CIFAR-10, 0.5 for CIFAR-100
-alpha = 0.01
-num_iter = 40
+        for images, labels in train_loader:
 
-j=0
-for l in lyrs:
-    for n in neurons:
-        for i in range(n_experiments):
-            model = NeuralNet(hidden_layers=l, hidden_units=n)
-            un_model = copy.deepcopy(model)
-            criterion = nn.CrossEntropyLoss()
-            optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+            optimizer.zero_grad()
 
-            if l==lyrs[-1]: #overfitting case
-                small_train_dataset = Subset(train_loader.dataset, range(5))
-                train_loader = DataLoader(
-                    small_train_dataset,
-                    batch_size=train_loader.batch_size,
-                    shuffle=False
-                )
-                num_epochs=100 
+            outputs = moc_model(images)
 
-           
+            clean_loss = criterion(outputs,labels).mean()
 
-            for epoch in range(num_epochs):
-                loss = 0.0
-                for images, labels in train_loader:
+            # clean_loss.backward()
 
-                    model.eval()
-                    _, deltas = pgd_m_x(model,images, labels,epsilon,criterion,"L2",box_clipping,num_iter,alpha)
-                    
-                    adv_images = images+deltas
-                    
+            # clean_grad_norm = torch.sqrt(
+            #     sum(
+            #         p.grad.detach().pow(2).sum()
+            #         for p in moc_model.parameters()
+            #         if p.grad is not None
+            #     )
+            # )
 
-                    model.train()
-                    optimizer.zero_grad()
-                    logits = model(adv_images)
-                    loss = criterion(logits, labels)
-                    loss.backward()
-                    optimizer.step()
+            # print(clean_grad_norm)
 
-                print(
-                    f'Epoch [{epoch+1}/{num_epochs}], '
-                    f'Loss: {loss.item():.4f}'
-                )
-
-            ##
-           
-            model.eval()
-            with torch.no_grad():
-                train_correct = 0
-                train_total = 0
-                for images, labels in train_loader:
-                    probs = torch.softmax(model(images), dim=1)
-                    preds = probs.argmax(dim=1)
-                    train_total += labels.size(0)
-                    train_correct += (preds == labels).sum().item()
-
-                test_correct = 0
-                test_total = 0
-                for images, labels in test_loader:
-                    probs = torch.softmax(model(images), dim=1)
-                    preds = probs.argmax(dim=1)
-                    test_total += labels.size(0)
-                    test_correct += (preds == labels).sum().item()
-
-                train_acc = train_correct / train_total
-                test_acc = test_correct / test_total
-            print(f"train acc = {train_acc:.4f}")
-            print(f"test acc = {test_acc:.4f}")
-
-
-            aua_test = accuracy_under_attack(
-                model,
-                test_loader,
-                criterion,
-                box_clipping,
-                "L2",
-                epsilon,
-                alpha,
-                num_iter
+            #can we speed this up?
+            moc_loss, omega_values, t_grid = moc_regularizer(
+                model=moc_model,
+                X=images,          #might also be X or X_reference...
+                dy_f=l2_distance,
+                norm=norm,
+                t_values=None,
+                clipping_f=clipping,
+                step_size=alpha,
+                num_iter=num_iter,
+                num_restarts=num_restarts,
+                batch_size=batch_size,
             )
 
-            print(f"accuracy under attack (test loader) = {aua_test:.4f}")
+            # moc_loss.backward()
+            # moc_grad_norm = torch.sqrt(
+            #     sum(
+            #         p.grad.detach().pow(2).sum()
+            #         for p in moc_model.parameters()
+            #         if p.grad is not None
+            #     )
+            # )
 
-            #save softmax output from the model
-            model = nn.Sequential(
-                model,
-                nn.Softmax(dim=1)
-            )
-
-            un_model = nn.Sequential(
-                un_model,
-                nn.Softmax(dim=1)
-            )
-
-
-            export_split_to_csv(export_train_loader, "train", model, un_model, save_path, j)
-            export_split_to_csv(export_test_loader, "test", model, un_model, save_path, j)
-
-            start_time = time.time()
-            est = LipConstEstimator(model=model)
-            lip_trivial = est.estimate(method="trivial")
-            lip_trivial_t = time.time() - start_time
-
-
-            lip_eclipse = 0
-            lip_eclipse_t=0
-            lip_eclipse_fast=0
-            lip_eclipse_fast_t=0
-
-            
-            start_time = time.time()
-            est = LipConstEstimator(model=model)
-            lip_eclipse = est.estimate(method="ECLipsE")
-            lip_eclipse_t = time.time() - start_time
+            # print(moc_grad_norm)
 
            
-            start_time = time.time()
-            est = LipConstEstimator(model=model)
-            lip_eclipse_fast = est.estimate(method="ECLipsE_Fast")
-            lip_eclipse_fast_t = time.time() - start_time
+            loss = (clean_loss+ lambda_moc* moc_loss)
 
-            start_time = time.time()
-            estimator_l1 = LipConstEstimatorL1(model=model)
-            l1_bound = estimator_l1.estimate_trivial_l1()
-            l1_bound_t = time.time()-start_time
+            loss.backward()
 
-            csv_path = out_dir / f"model_{j}.csv"
-            with open(csv_path, "w", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow(["constant type", "value", "seconds required"])
-                writer.writerow(["trivial_l2", lip_trivial, lip_trivial_t ]) #trivial must be adj for softmaxhead
-                writer.writerow(["trivial_l1", l1_bound, l1_bound_t ])
-                writer.writerow(["ECLipsE", lip_eclipse, lip_eclipse_t])
-                writer.writerow(["ECLipsE_Fast", lip_eclipse_fast, lip_eclipse_fast_t])
-                writer.writerow(["accuracy on train", train_acc, 0])
-                writer.writerow(["accuracy on test", test_acc, 0])
-            j=j+1
+            optimizer.step()
+
+            total_clean_loss += clean_loss.item()
+            total_moc_loss += moc_loss.item()
+
+        print(
+            f"Epoch [{epoch + 1}/{num_epochs}] "
+            # f"Clean Loss: "
+            # f"{total_clean_loss / len(train_loader):.4f} "
+            # f"MOC Loss: "
+            # f"{total_moc_loss / len(train_loader):.4f}"
+            f"{loss.item()}"
+        )
+
 
 
 
