@@ -9,26 +9,17 @@ Epoch [8/10], Training Loss: 0.4426
 Epoch [9/10], Training Loss: 0.4214
 Epoch [10/10], Training Loss: 0.4050
 clean test acc = 0.9049
-test accuracy under attack  = 0.9029
-Epoch [1/10], Training Loss (adv): 2.2790
-Epoch [2/10], Training Loss (adv): 2.0673
-Epoch [3/10], Training Loss (adv): 1.0419
-Epoch [4/10], Training Loss (adv): 0.6793
-Epoch [5/10], Training Loss (adv): 0.5740
-Epoch [6/10], Training Loss (adv): 0.5186
-Epoch [7/10], Training Loss (adv): 0.4773
-Epoch [8/10], Training Loss (adv): 0.4500
-Epoch [9/10], Training Loss (adv): 0.4277
-Epoch [10/10], Training Loss (adv): 0.4098
-clean test acc (adv) = 0.9048
-test accuracy under attack (adv)  = 0.9025
-Epoch [1/10] 2.3313863277435303
-Epoch [2/10] 2.318159341812134
-Epoch [3/10] 2.314504384994507
-Epoch [4/10] 2.311537265777588
-Epoch [5/10] 2.312415599822998
-Epoch [6/10] 2.309094190597534
-Epoch [7/10] 2.310042381286621
-Epoch [8/10] 2.3071682453155518
-Epoch [9/10] 2.3075737953186035
-Epoch [10/10] 2.307373046875
+test accuracy under attack  = 0.8713
+Epoch [1/10], Training Loss (adv): 2.2912
+Epoch [2/10], Training Loss (adv): 2.2027
+Epoch [3/10], Training Loss (adv): 1.4192
+Epoch [4/10], Training Loss (adv): 0.8612
+Epoch [5/10], Training Loss (adv): 0.7082
+Epoch [6/10], Training Loss (adv): 0.6317
+Epoch [7/10], Training Loss (adv): 0.5798
+Epoch [8/10], Training Loss (adv): 0.5457
+Epoch [9/10], Training Loss (adv): 0.5182
+Epoch [10/10], Training Loss (adv): 0.4976
+clean test acc (adv) = 0.9058
+test accuracy under attack (adv)  = 0.8746
+Epoch [1/10] nan

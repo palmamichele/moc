@@ -9,14 +9,14 @@ import numpy as np
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
-from utils import Tee, NeuralNet, accuracy_under_attack, box_clipping, pgd_m_x, pgd_moc
+from utils import Tee, NeuralNet, accuracy_under_attack, box_clipping, pgd_m_x, pgd_moc, make_t_grid
 from pgdmoc.pgd_moc import moc_regularizer
 
 #PARS
 num_experiments=1
 epsilon = 0.3 #usually be 0.3 for MNIST, 8/255 for CIFAR-10, 0.5 for CIFAR-100
 alpha = 0.01 #learning rate for PGD
-num_iter = 30 #of PGD
+num_iter = 15 #of PGD
 num_classes = 10
 num_epochs=10
 num_restarts = 1
@@ -28,6 +28,14 @@ norm="L2" #on X space
 clipping=None
 lambda_moc = 0.5
 #
+
+
+
+def l2_distance(x,y):
+    diff = x-y
+    return diff.flatten(1).norm(p=2, dim=1)
+
+
 
 
 torch.backends.cudnn.deterministic = True
@@ -66,6 +74,10 @@ test_data = MNIST(root=str(data_path), train=False, download=True, transform=tra
 train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False)
 test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
 
+X_train = train_data.data.float() 
+X_train_flat = X_train.view(X_train.shape[0], -1)
+t_values = make_t_grid(X=X_train_flat, norm=norm, nbins=nbins)
+
 
 for i in range(num_experiments):
 
@@ -88,26 +100,21 @@ for i in range(num_experiments):
         print(f'Epoch [{epoch+1}/{num_epochs}], 'f'Training Loss: {loss.item():.4f}')
     #store train loss of the vanilla model
 
-    X = []
-    Y = []
-    
+
     vanilla_model.eval()
     with torch.no_grad():
         
         test_correct = 0
         test_total = 0
         for images, labels in test_loader:
-            X.append(images)
             probs = torch.softmax(vanilla_model(images), dim=1)
-            Y.append(vanilla_model(images))
             preds = probs.argmax(dim=1)
             test_total += labels.size(0)
             test_correct += (preds == labels).sum().item()
 
         test_acc = test_correct / test_total
     print(f"clean test acc = {test_acc:.4f}")
-    X = torch.cat(X, dim=0)
-    Y = torch.cat(Y, dim=0)
+
 
     aua_test = accuracy_under_attack(
         vanilla_model,
@@ -225,7 +232,7 @@ for i in range(num_experiments):
                 X=images,          #might also be X or X_reference...
                 dy_f=l2_distance,
                 norm=norm,
-                t_values=None,
+                t_values=t_values,
                 clipping_f=clipping,
                 step_size=alpha,
                 num_iter=num_iter,
