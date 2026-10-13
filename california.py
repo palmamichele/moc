@@ -1,13 +1,15 @@
-from pathlib import Path
 import torch
 import copy 
 import random
 import torchvision.transforms as transforms
+import pandas as pd 
 import numpy as np 
+import matplotlib.pyplot as plt 
 from torch import nn, optim
+from pathlib import Path
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
-from utils import Tee, NeuralNet, accuracy_under_attack, box_clipping, pgd_m_x, pgd_moc, make_t_grid
+from utils import Tee, NeuralNet, accuracy_under_attack, box_clipping, pgd_m_x, pgd_moc, make_t_grid, compute_robustness_auc
 from pgdmoc.pgd_moc import moc_regularizer
 from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import train_test_split
@@ -17,20 +19,23 @@ from sklearn.metrics import r2_score
 
 
 #PARS
-num_experiments=1
-epsilon = 0.3 #usually be 0.3 for MNIST, 8/255 for CIFAR-10, 0.5 for CIFAR-100
+num_experiments=5
+attacks_budget = [0.001, 0.1, 0.3, 0.5, 1, 5, 10] #usually be 0.3 for MNIST, 8/255 for CIFAR-10, 0.5 for CIFAR-100
+epsilon = 0.3
 alpha = 0.01 #learning rate for PGD
 num_iter = 10 #of PGD
 num_classes = 10
 num_epochs=500
 num_restarts = 1
 seed=0
-batch_size=512
-nbins=10 #for MOC
+batch_size= 256
+nbins=5 #for MOC
 learning_rate = alpha
 norm="L2" #on X space
 clipping=None
-lambda_k = 0.20
+lambda_k = 1
+model_types = ["vanilla", "adv", "mocreg"]
+
 #
 
 
@@ -69,9 +74,12 @@ save_path = base_path / "california"
 save_path.mkdir(parents=True, exist_ok=True)
 
 folder_path =  Path("experiments") / str("california")
+file_ext = "_"+str(batch_size)+"_"+norm+"_"+str(lambda_k)
+
 cal_data = fetch_california_housing()
 X = cal_data.data.astype(np.float32)
 y = cal_data.target.astype(np.float32).reshape(-1, 1)
+
 
 
 X_train, X_test, y_train, y_test = train_test_split(
@@ -91,8 +99,11 @@ X_test_tensor = torch.tensor(X_test_scaled, dtype=torch.float32)
 y_train_tensor = torch.tensor(y_train_scaled, dtype=torch.float32)
 y_test_tensor = torch.tensor(y_test_scaled, dtype=torch.float32)
 
-t_values =  np.linspace(0.001, epsilon, nbins)
+t_values = np.linspace(0, epsilon, nbins)
 train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+
+
+
 
 train_loader = DataLoader(
     train_dataset,
@@ -112,13 +123,28 @@ test_loader = DataLoader(
 out_dir = Path("experiments") / "california"
 out_dir.mkdir(parents=True, exist_ok=True)
 
+all_experiment_results = []
+all_experiment_mocs = {
+    "vanilla": [],
+    "adv": [],
+    "mocreg": [],
+}
+
 
 for i in range(num_experiments):
+    all_mocs={}
+
+    all_mse = {} 
+
+    all_adv_mse = {}
+
+    all_gen_gap ={}
+
     base_model = NeuralNet(hidden_layers=2, hidden_units=16, input_size=8, output_size=1)
     criterion = nn.MSELoss()
     
 
-    for model_type in ["vanilla", "adv", "mocreg"]:
+    for model_type in model_types:
         model = copy.deepcopy(base_model)
         optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.0)
         
@@ -226,30 +252,58 @@ for i in range(num_experiments):
                         clipping_f=clipping,
                         step_size=alpha,
                         num_iter=num_iter,
-                        num_restarts=num_restarts,
-                        batch_size=batch_size,
+                        num_restarts=num_restarts
+                    )
+                    params = tuple(model.parameters())
+
+                    clean_grads = torch.autograd.grad(
+                        clean_loss,
+                        params,
+                        retain_graph=True,
+                        create_graph=False,
+                        allow_unused=True,
                     )
 
-
-                    clean_loss.backward(retain_graph=True)
-                    grad_clean = torch.nn.utils.parameters_to_vector(
-                        [p.grad for p in model.parameters() if p.grad is not None]
+                    moc_grads = torch.autograd.grad(
+                        moc_loss,
+                        params,
+                        retain_graph=True,
+                        create_graph=False,
+                        allow_unused=True,
                     )
-                    norm_clean = grad_clean.norm(p=p)
 
-                    optimizer.zero_grad()
-                    moc_loss.backward(retain_graph=True)
-                    grad_moc = torch.nn.utils.parameters_to_vector(
-                        [p.grad for p in model.parameters() if p.grad is not None]
-                    )
-                    norm_moc = grad_moc.norm(p=2)
-                    lambda_moc = norm_clean / (norm_moc + 1e-12)
+                    norm_clean = torch.sqrt(sum(
+                        (g.detach() ** 2).sum()
+                        for g in clean_grads
+                        if g is not None
+                    ))
 
-                    optimizer.zero_grad()
-                    loss = clean_loss + lambda_k*lambda_moc * moc_loss
-                    loss.backward()
+                    norm_moc = torch.sqrt(sum(
+                        (g.detach() ** 2).sum()
+                        for g in moc_grads
+                        if g is not None
+                    ))
 
+                    #lambda_moc = norm_clean / (norm_moc + 1e-12)
                     
+
+                    # clean_loss.backward(retain_graph=True)
+                    # grad_clean = torch.nn.utils.parameters_to_vector(
+                    #     [p.grad for p in model.parameters() if p.grad is not None]
+                    # )
+                    # norm_clean = grad_clean.norm(p=p)
+
+                    # optimizer.zero_grad()
+                    # moc_loss.backward(retain_graph=True)
+                    # grad_moc = torch.nn.utils.parameters_to_vector(
+                    #     [p.grad for p in model.parameters() if p.grad is not None]
+                    # )
+                    # norm_moc = grad_moc.norm(p=2)
+                    # lambda_moc = norm_clean / (norm_moc + 1e-12)
+                    optimizer.zero_grad()
+                    #loss = clean_loss + lambda_k*lambda_moc.detach() * moc_loss
+                    loss = clean_loss + lambda_k* moc_loss
+                    loss.backward()
                     optimizer.step()
 
                     # torch.nn.utils.clip_grad_norm_(
@@ -284,8 +338,8 @@ for i in range(num_experiments):
         train_mse = criterion(pred_train, y_train_tensor).item()
         test_mse = criterion(pred_test, y_test_tensor).item()
 
-        print(model_type)
-        print(f"test MSE ={test_mse}")
+        # print(model_type)
+        # print(f"test MSE ={test_mse}")
         #print(f"train MSE ={train_mse}")
 
 
@@ -299,29 +353,63 @@ for i in range(num_experiments):
                 pred_test.cpu().numpy().ravel()
         )
 
-        print(f"test R^2 ={test_r2}")
+        # print(f"test R^2 ={test_r2}")
         #print(f"train R^2 ={train_r2}")
 
-        test_mse_adv = 0
-        #regardless of the type, compute (adversarial) test accuracy/mse, 
-        _, deltas = pgd_m_x(model,X_test_tensor, y_test_tensor,epsilon,per_example_mse,norm,clipping,num_iter,alpha)
-        adv_input = X_test_tensor+deltas
+        all_adv_mse[model_type]={}
 
-        # Evaluate adversarial examples
-        with torch.no_grad():
-            pred = model(adv_input)
-        
-        test_mse_adv = criterion(pred, y_test_tensor).item()
+        for b in attacks_budget:
+            test_mse_adv = 0
+            #regardless of the type, compute (adversarial) test accuracy/mse, 
+            _, deltas = pgd_m_x(model,X_test_tensor, y_test_tensor,b,per_example_mse,norm,clipping,num_iter,alpha)
+            adv_input = X_test_tensor+deltas
 
-        test_r2_adv = r2_score(
-                    y_test_tensor.cpu().numpy().ravel(),
-                    pred.cpu().numpy().ravel()
-        )
+            # Evaluate adversarial examples
+            with torch.no_grad():
+                pred = model(adv_input)
+            
+            test_mse_adv = criterion(pred, y_test_tensor).item()
 
-        print(f"test mse (adv) ={test_mse_adv}")
-        print(f"test R^2 (adv) ={test_r2_adv}")
+            test_r2_adv = r2_score(
+                        y_test_tensor.cpu().numpy().ravel(),
+                        pred.cpu().numpy().ravel()
+            )
+            all_adv_mse[model_type][b] = test_mse_adv #later we also use an array for epsilon value 
+
+        # print(f"test mse (adv) ={test_mse_adv}")
+        # print(f"test R^2 (adv) ={test_r2_adv}")
 
         #save the stats 
+
+        moc, _ = pgd_moc(
+        model, #f_\theta
+        X_train_tensor,
+        model(X_train_tensor), #either f_\theta(X) or original labels for X
+        per_example_mse, #d_Y as loss function (assuming it satisfies metric properties)
+        clipping_f=clipping,
+        norm=norm, #L2, L1, Linf
+        t_values=t_values, #t_1,...,t_K
+        step_size=alpha, 
+        numiter=num_iter,
+        numrestarts=num_restarts,
+        batch_size=batch_size)
+
+
+        if isinstance(moc, torch.Tensor):
+            moc = moc.detach().cpu().numpy()
+        else:
+            moc = np.asarray(moc)
+
+        moc = moc.reshape(-1)
+        all_mocs[model_type] = moc
+        all_experiment_mocs[model_type].append(moc.copy())
+
+
+        all_mse[model_type] = test_mse
+
+        
+
+        all_gen_gap[model_type] = np.abs(train_mse-test_mse)
 
         #regardless of the type, compute the moc of trained network. 
 
@@ -337,3 +425,119 @@ for i in range(num_experiments):
         #     )
         
         # print(f"test accuracy under attack  = {aua_test:.4f}")
+
+    # plt.figure(figsize=(8, 5))
+
+    for model_type, moc_values in all_mocs.items():
+        plt.plot(
+            t_values,
+            moc_values,
+            marker="o",
+            label=model_type
+        )
+
+
+    results_data = []
+    for model_type in model_types:
+
+        auc = compute_robustness_auc(
+        all_adv_mse[model_type],
+        attacks_budget,
+        )
+
+        row = ({
+            "Experiment": i,
+            "Model": model_type,
+            "Clean (test) MSE": all_mse[model_type],
+            "Generalization Gap (abs value)": all_gen_gap[model_type],
+            "AUC": auc,
+        })
+        for b in attacks_budget:
+            row[f"Adv (test) MSE {b}"] =  all_adv_mse[model_type][b]
+        results_data.append(row)
+    df_results = pd.DataFrame(results_data)
+
+    best_clean_mse = df_results["Clean (test) MSE"].min()
+    df_results["Total Distance"] = df_results["Clean (test) MSE"] - best_clean_mse
+
+    for b in attacks_budget:
+        col_name = f"Adv (test) MSE {b}"
+        best_adv_mse_for_eps = df_results[col_name].min()
+        
+        df_results["Total Distance"] += df_results[col_name] - best_adv_mse_for_eps
+
+  
+    all_experiment_results.append(df_results)
+
+
+    # plt.xlabel("t")
+    # plt.ylabel("MOC(t)")
+    # plt.title("MOC comparison across trained models")
+    # plt.legend()
+    # plt.grid(True, alpha=0.3)
+    # plt.tight_layout()
+
+    # # Save the figure
+    # plt.savefig(out_dir / "moc_comparison.png", dpi=300)
+
+    # plt.show()
+
+
+
+
+
+df_all = pd.concat(all_experiment_results, ignore_index=True)
+# Metrics to aggregate
+metrics = [
+    "Clean (test) MSE",
+    "Generalization Gap (abs value)",
+    "Total Distance",
+    "AUC"
+]
+
+for b in attacks_budget:
+    metrics.append(f"Adv (test) MSE {b}")
+
+# Mean and sample standard deviation across experiments
+df_summary = (
+    df_all
+    .groupby("Model")[metrics]
+    .agg(["mean", "std"])
+)
+
+print("\nResults across all experiments (mean ± std):")
+print(df_summary.round(4))
+
+#df_all.to_csv(out_dir / f"experiments_results{file_ext}.csv", index=False)
+df_summary.to_csv(out_dir / f"summary{file_ext}.csv")
+
+#for the evaluation, we might take the highest clean accuracy (lowest clean mse) on test, similarly for adversarial accuracy/mse. 
+#then we compute each model accuracies distances from these. the model that achieves lowest in both is the best model. 
+
+plt.figure(figsize=(8, 5))
+moc_summary = {}
+for model_type in model_types:
+    moc_array = np.stack(all_experiment_mocs[model_type], axis=0)
+
+    moc_mean = moc_array.mean(axis=0)
+
+    # Sample standard deviation across initializations
+    moc_std = moc_array.std(axis=0, ddof=1)
+
+    moc_summary[model_type] = {
+        "mean": moc_mean,
+        "std": moc_std,
+        "values": moc_array,
+    }
+
+    #create dataframe for PGFPlots
+    df_moc = pd.DataFrame({
+        "t": t_values,
+        "moc_mean": moc_mean,
+        "moc_std": moc_std,
+    })
+
+    df_moc.to_csv(
+        out_dir / f"moc_{model_type}{file_ext}.csv",
+        index=False
+    )

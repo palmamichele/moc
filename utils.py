@@ -72,6 +72,28 @@ def accuracy_under_attack(
 
 
 
+def compute_robustness_auc(adv_mse_by_eps, attacks_budget):
+    """
+    Compute the area under the adversarial MSE curve
+    using the trapezoidal rule.
+
+    Lower AUC = better average adversarial MSE over
+    the evaluated perturbation range.
+    """
+    epsilons = np.asarray(attacks_budget, dtype=float)
+
+    # Ensure points are ordered by perturbation magnitude.
+    order = np.argsort(epsilons)
+    epsilons = epsilons[order]
+
+    mse_values = np.asarray(
+        [adv_mse_by_eps[b] for b in attacks_budget],
+        dtype=float,
+    )[order]
+
+    return float(np.trapezoid(mse_values, x=epsilons))
+
+
 
 class LipConstEstimatorL1():
     def __init__(self, model):
