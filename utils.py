@@ -23,7 +23,6 @@ class Tee:
 
 
 
-
 def box_clipping(x):
     #for MNIST in [0,1]^n
     a=0
@@ -31,7 +30,25 @@ def box_clipping(x):
     return torch.clamp(x, a,b)
 
 
+def per_example_mse(pred, target):
+    # nn.MSELoss(reduction='none') returns shape (batch_size, 1)
+    # We squeeze it to get (batch_size,)
+    loss_fn = nn.MSELoss(reduction='none')
+    return loss_fn(pred, target).squeeze(-1)
 
+
+def l2_distance(x,y):
+    diff = x-y
+    return diff.flatten(1).norm(p=2, dim=1)
+
+
+def l1_distance(x,y):
+    diff = x-y
+    return diff.flatten(1).norm(p=1, dim=1)
+
+def linf_distance(x,y):
+    diff = x - y
+    return diff.flatten(1).norm(p=float('inf'), dim=1)
 
 def accuracy_under_attack(
     model,

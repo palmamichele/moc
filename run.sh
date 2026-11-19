@@ -1,14 +1,20 @@
 #!/bin/bash
-rm -rf experiments
-rm -rf data
 
-source .venv/bin/activate
-python3 linear-california.py
-python3 california.py
-python3 iris.py
-python3 MNIST.py
-python3 mocs.py
-python3 mini-batch-test.py
-python3 alexnet.py
-echo "done"
+DEST="/Users/palmamichele/Desktop/toWorkMachineOnly/Research Projects/Beyond Lipschitz/6a8ff1cf4469cbc36d0201bb/experiments"
+
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
+PYTHON="$SCRIPT_DIR/.venv/bin/python"
+
+osascript <<EOF
+tell application "Terminal"
+    activate
+    do script "cd '$SCRIPT_DIR' && '$PYTHON' mnist.py --batch-size 64"
+    do script "cd '$SCRIPT_DIR' && '$PYTHON' mnist.py --batch-size 4096"
+end tell
+EOF
 
